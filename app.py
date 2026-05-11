@@ -3,8 +3,8 @@ import json
 import os
 
 # --- CONFIGURAÇÕES DE ACESSO ---
-USUARIO_CORRETO = "admin"
-SENHA_CORRETA = "1234" 
+USUARIO_CORRETO = "giovanne"
+SENHA_CORRETA = "8708" 
 
 st.set_page_config(page_title="Status Fluxo", layout="centered")
 
