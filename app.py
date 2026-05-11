@@ -30,11 +30,14 @@ def carregar_dados():
     if os.path.exists("dados.json"):
         with open("dados.json", "r") as f:
             d = json.load(f)
-            # CORREÇÃO DO ERRO: Garante que todas as chaves novas existam
+            # Garante que chaves novas existam para evitar erros
             if "quinzena" not in d: d["quinzena"] = "1ª Quinzena"
             if "salario" not in d: d["salario"] = 0.0
             if "extra" not in d: d["extra"] = 0.0
             if "pct" not in d: d["pct"] = 10.0
+            if "contas_fixas" not in d: d["contas_fixas"] = []
+            if "gastos_diarios" not in d: d["gastos_diarios"] = []
+            if "metas" not in d: d["metas"] = []
             return d
     return {"patrimonio": 0.0, "gastos_diarios": [], "contas_fixas": [], "metas": [], "salario": 0.0, "extra": 0.0, "pct": 10.0, "quinzena": "1ª Quinzena"}
 
@@ -66,10 +69,10 @@ if verificar_login():
     tab1, tab2, tab3 = st.tabs(["💰 Fluxo Atual", "🎯 Metas", "⚙️ Virar Quinzena"])
 
     with tab1:
-        # Pega a quinzena de forma segura
         q_label = dados.get("quinzena", "1ª Quinzena")
         st.markdown(f"<div class='quinzena-header'>{q_label}</div>", unsafe_allow_html=True)
         
+        # --- ENTRADAS ---
         col_s, col_e, col_p = st.columns(3)
         sal_txt = col_s.text_input("Recebido (Q)", value=str(dados.get("salario", 0.0)))
         ext_txt = col_e.text_input("Extra (Q)", value=str(dados.get("extra", 0.0)))
@@ -89,6 +92,7 @@ if verificar_login():
         
         st.metric("SALDO DISPONÍVEL", f"R$ {saldo_livre:.2f}")
 
+        # --- INVESTIMENTOS ---
         st.subheader("🏦 Guardar Investimento")
         c1, c2 = st.columns(2)
         with c1:
@@ -105,9 +109,41 @@ if verificar_login():
                 st.rerun()
 
         st.divider()
+
+        # --- CONTAS E PARCELAS ---
+        st.subheader("📝 Contas e Parcelas")
+        with st.expander("+ Adicionar Conta"):
+            n_c = st.text_input("Nome da Conta")
+            v_c_txt = st.text_input("Valor da Parcela R$")
+            p_a = st.number_input("Parcela Atual", min_value=1, value=1)
+            p_t = st.number_input("Total de Parcelas", min_value=1, value=1)
+            if st.button("Salvar Conta"):
+                v_c = format_num(v_c_txt)
+                if n_c and v_c > 0:
+                    dados['contas_fixas'].append({"nome": n_c, "valor": v_c, "atual": p_a, "total": p_t})
+                    salvar_dados(dados)
+                    st.rerun()
+
+        for i, c in enumerate(dados['contas_fixas']):
+            st.markdown(f"<div class='conta-card'><b>{c['nome']}</b> | {c['atual']}/{c['total']} | R$ {c['valor']:.2f}</div>", unsafe_allow_html=True)
+            col_p1, col_p2 = st.columns(2)
+            if col_p1.button(f"PAGAR PARCELA", key=f"pay_{i}"):
+                dados['gastos_diarios'].append({"desc": f"Pago: {c['nome']} ({c['atual']}/{c['total']})", "valor": c['valor']})
+                c['atual'] += 1
+                if c['atual'] > c['total']: dados['contas_fixas'].pop(i)
+                salvar_dados(dados)
+                st.rerun()
+            if col_p2.button("Excluir", key=f"del_c_{i}"):
+                dados['contas_fixas'].pop(i)
+                salvar_dados(dados)
+                st.rerun()
+
+        st.divider()
+
+        # --- GASTOS DIÁRIOS ---
         st.subheader("🛍️ Lançar Gasto")
-        g_d = st.text_input("Descrição")
-        g_v_txt = st.text_input("Valor R$", key="gv_fix")
+        g_d = st.text_input("Descrição do gasto")
+        g_v_txt = st.text_input("Valor R$", key="gv_mobile")
         if st.button("LANÇAR AGORA"):
             g_v = format_num(g_v_txt)
             if g_d and g_v > 0:
@@ -131,19 +167,19 @@ if verificar_login():
             p = min(dados['patrimonio'] / m['alvo'], 1.0) if m['alvo'] > 0 else 0
             st.write(f"**{m['nome']}**")
             st.progress(p)
-            if st.button("Excluir", key=f"dm_{i}"):
+            if st.button("Excluir Meta", key=f"dm_{i}"):
                 dados['metas'].pop(i)
                 salvar_dados(dados)
                 st.rerun()
 
     with tab3:
         st.subheader("🔄 Virada de Quinzena")
-        st.write(f"Saldo para transportar: **R$ {saldo_livre:.2f}**")
-        if st.button("FINALIZAR E TRANSPORTAR"):
+        st.write(f"Saldo atual para transporte: **R$ {saldo_livre:.2f}**")
+        if st.button("FINALIZAR QUINZENA E TRANSPORTAR SALDO"):
             dados["extra"] = saldo_livre
             dados["salario"] = 0.0
             dados["gastos_diarios"] = []
             dados["quinzena"] = "2ª Quinzena" if dados.get("quinzena") == "1ª Quinzena" else "1ª Quinzena"
             salvar_dados(dados)
-            st.success("Pronto! Saldo transportado.")
+            st.success("Saldo transportado e gastos limpos!")
             st.rerun()
