@@ -3,12 +3,12 @@ import json
 import os
 
 # --- CONFIGURAÇÕES DE ACESSO ---
-USUARIO_CORRETO = "giovanne"
-SENHA_CORRETA = "8708" 
+USUARIO_CORRETO = "admin"
+SENHA_CORRETA = "1234" 
 
 st.set_page_config(page_title="Status Fluxo", layout="centered")
 
-# Estilo visual
+# Estilo visual para Mobile
 st.markdown("""
     <style>
     .stButton>button { width: 100%; border-radius: 8px; font-weight: bold; }
@@ -16,6 +16,15 @@ st.markdown("""
     .conta-card { background-color: #161b22; padding: 10px; border-radius: 8px; border-left: 5px solid #58a6ff; margin-bottom: 10px; }
     </style>
     """, unsafe_allow_html=True)
+
+# Função para aceitar vírgula ou ponto
+def format_num(valor):
+    if isinstance(valor, str):
+        valor = valor.replace(',', '.')
+    try:
+        return float(valor)
+    except:
+        return 0.0
 
 def verificar_login():
     if "autenticado" not in st.session_state:
@@ -48,14 +57,20 @@ if verificar_login():
 
     st.title("📊 Status Fluxo Pro")
 
-    tab1, tab2, tab3 = st.tabs(["💰 Fluxo e Pagamentos", "🎯 Patrimônio", "⚙️ Ajustes"])
+    tab1, tab2, tab3 = st.tabs(["💰 Fluxo e Pagamentos", "🎯 Metas e Patrimônio", "⚙️ Ajustes"])
 
     with tab1:
-        # --- SALDO E CONFIG ---
+        # --- ENTRADAS (Tratando Vírgula e Ponto) ---
         col_s, col_e, col_p = st.columns(3)
-        salario = col_s.number_input("Salário", value=float(dados.get("salario", 0)))
-        extra = col_e.number_input("Extra", value=float(dados.get("extra", 0)))
-        pct = col_p.number_input("Meta %", value=float(dados.get("pct", 10)))
+        
+        # Usamos text_input para permitir que o usuário digite a vírgula livremente
+        sal_txt = col_s.text_input("Salário", value=str(dados.get("salario", 0.0)))
+        ext_txt = col_e.text_input("Extra", value=str(dados.get("extra", 0.0)))
+        pct_txt = col_p.text_input("Meta %", value=str(dados.get("pct", 10.0)))
+        
+        salario = format_num(sal_txt)
+        extra = format_num(ext_txt)
+        pct = format_num(pct_txt)
         
         if salario != dados["salario"] or extra != dados["extra"] or pct != dados["pct"]:
             dados.update({"salario": salario, "extra": extra, "pct": pct})
@@ -65,7 +80,7 @@ if verificar_login():
         total_saidas = sum(g['valor'] for g in dados['gastos_diarios'])
         saldo_livre = (salario + extra) - total_saidas
         
-        st.metric("SALDO LIVRE (PÓS GASTOS)", f"R$ {saldo_livre:.2f}")
+        st.metric("SALDO LIVRE", f"R$ {saldo_livre:.2f}")
 
         # --- INVESTIMENTOS ---
         st.subheader("🏦 Guardar Valor Sugerido")
@@ -87,15 +102,18 @@ if verificar_login():
 
         # --- CONTAS COM PARCELAS ---
         st.subheader("📝 Contas e Parcelas")
-        with st.expander("+ Adicionar Carnê/Conta"):
+        with st.expander("+ Adicionar Conta"):
             n_c = st.text_input("Nome da Conta")
-            v_c = st.number_input("Valor da Parcela R$", min_value=0.0)
+            v_c_txt = st.text_input("Valor da Parcela R$")
             p_a = st.number_input("Parcela Atual", min_value=1, value=1)
             p_t = st.number_input("Total de Parcelas", min_value=1, value=1)
+            
             if st.button("Salvar Conta"):
-                dados['contas_fixas'].append({"nome": n_c, "valor": v_c, "atual": p_a, "total": p_t})
-                salvar_dados(dados)
-                st.rerun()
+                v_c = format_num(v_c_txt)
+                if n_c and v_c > 0:
+                    dados['contas_fixas'].append({"nome": n_c, "valor": v_c, "atual": p_a, "total": p_t})
+                    salvar_dados(dados)
+                    st.rerun()
 
         for i, c in enumerate(dados['contas_fixas']):
             st.markdown(f"""<div class='conta-card'>
@@ -105,11 +123,8 @@ if verificar_login():
             
             col_p1, col_p2 = st.columns(2)
             if col_p1.button(f"PAGAR PARCELA {c['atual']}", key=f"pay_{i}"):
-                # Registra o gasto no saldo do mês
                 dados['gastos_diarios'].append({"desc": f"Pago: {c['nome']} ({c['atual']}/{c['total']})", "valor": c['valor']})
-                # Sobe a parcela
                 c['atual'] += 1
-                # Se acabou as parcelas, remove a conta
                 if c['atual'] > c['total']:
                     dados['contas_fixas'].pop(i)
                 salvar_dados(dados)
@@ -123,38 +138,48 @@ if verificar_login():
         st.divider()
 
         # --- GASTOS DIÁRIOS ---
-        st.subheader("🛍️ Lançar Gasto Avulso")
-        g_d = st.text_input("O que comprou?")
-        g_v = st.number_input("Valor R$", min_value=0.0, key="gv_avulso")
+        st.subheader("🛍️ Lançar Gasto")
+        g_d = st.text_input("Descrição")
+        g_v_txt = st.text_input("Valor R$", key="gv_txt")
         if st.button("LANÇAR GASTO"):
+            g_v = format_num(g_v_txt)
             if g_d and g_v > 0:
                 dados['gastos_diarios'].append({"desc": g_d, "valor": g_v})
                 salvar_dados(dados)
                 st.rerun()
-        
-        with st.expander("Ver Histórico de Gastos"):
-            for idx, g in enumerate(reversed(dados['gastos_diarios'])):
-                st.write(f"• {g['desc']}: R$ {g['valor']:.2f}")
-                if st.button("Estornar", key=f"st_{idx}"):
-                    dados['gastos_diarios'].remove(g)
-                    salvar_dados(dados)
-                    st.rerun()
 
     with tab2:
         st.subheader("💰 Patrimônio Acumulado")
         st.title(f"R$ {dados['patrimonio']:.2f}")
-        # (Restante do código de metas mantido...)
+        
+        st.divider()
+        st.subheader("🎯 Suas Metas")
+        with st.expander("+ Novo Objetivo"):
+            m_n = st.text_input("Nome do Objetivo")
+            m_v_txt = st.text_input("Valor Alvo R$")
+            if st.button("Salvar Meta"):
+                m_v = format_num(m_v_txt)
+                if m_n and m_v > 0:
+                    dados['metas'].append({"nome": m_n, "alvo": m_v})
+                    salvar_dados(dados)
+                    st.rerun()
+
         for i, m in enumerate(dados['metas']):
             prog = min(dados['patrimonio'] / m['alvo'], 1.0) if m['alvo'] > 0 else 0
             st.write(f"**{m['nome']}**")
             st.progress(prog)
             st.write(f"R$ {dados['patrimonio']:.2f} de R$ {m['alvo']:.2f}")
+            if st.button("Excluir Meta", key=f"del_m_{i}"):
+                dados['metas'].pop(i)
+                salvar_dados(dados)
+                st.rerun()
 
     with tab3:
         if st.sidebar.button("Log Out"):
             st.session_state["autenticado"] = False
             st.rerun()
-        if st.button("Zerar Aplicativo (CUIDADO)"):
-            dados = {"patrimonio": 0.0, "gastos_diarios": [], "contas_fixas": [], "metas": [], "salario": 0.0, "extra": 0.0, "pct": 10.0}
-            salvar_dados(dados)
-            st.rerun()
+        if st.button("Zerar Aplicativo"):
+            if st.checkbox("Confirmar reset total?"):
+                dados = {"patrimonio": 0.0, "gastos_diarios": [], "contas_fixas": [], "metas": [], "salario": 0.0, "extra": 0.0, "pct": 10.0}
+                salvar_dados(dados)
+                st.rerun()
