@@ -29,7 +29,13 @@ def format_num(valor):
 def carregar_dados():
     if os.path.exists("dados.json"):
         with open("dados.json", "r") as f:
-            return json.load(f)
+            d = json.load(f)
+            # CORREÇÃO DO ERRO: Garante que todas as chaves novas existam
+            if "quinzena" not in d: d["quinzena"] = "1ª Quinzena"
+            if "salario" not in d: d["salario"] = 0.0
+            if "extra" not in d: d["extra"] = 0.0
+            if "pct" not in d: d["pct"] = 10.0
+            return d
     return {"patrimonio": 0.0, "gastos_diarios": [], "contas_fixas": [], "metas": [], "salario": 0.0, "extra": 0.0, "pct": 10.0, "quinzena": "1ª Quinzena"}
 
 def salvar_dados(dados):
@@ -60,9 +66,10 @@ if verificar_login():
     tab1, tab2, tab3 = st.tabs(["💰 Fluxo Atual", "🎯 Metas", "⚙️ Virar Quinzena"])
 
     with tab1:
-        st.markdown(f"<div class='quinzena-header'>{dados['quinzena']}</div>", unsafe_allow_html=True)
+        # Pega a quinzena de forma segura
+        q_label = dados.get("quinzena", "1ª Quinzena")
+        st.markdown(f"<div class='quinzena-header'>{q_label}</div>", unsafe_allow_html=True)
         
-        # --- ENTRADAS (Aceita . e ,) ---
         col_s, col_e, col_p = st.columns(3)
         sal_txt = col_s.text_input("Recebido (Q)", value=str(dados.get("salario", 0.0)))
         ext_txt = col_e.text_input("Extra (Q)", value=str(dados.get("extra", 0.0)))
@@ -76,66 +83,31 @@ if verificar_login():
             dados.update({"salario": salario, "extra": extra, "pct": pct})
             salvar_dados(dados)
 
-        # Cálculos
-        renda_total = salario + extra
         total_gastos = sum(g['valor'] for g in dados['gastos_diarios'])
-        saldo_livre = renda_total - total_gastos
-        aporte_sugerido = (renda_total * (pct / 100)) / 2
+        saldo_livre = (salario + extra) - total_gastos
+        aporte_sugerido = ((salario + extra) * (pct / 100)) / 2
         
         st.metric("SALDO DISPONÍVEL", f"R$ {saldo_livre:.2f}")
 
-        # --- BOTÕES DE APORTE ---
         st.subheader("🏦 Guardar Investimento")
         c1, c2 = st.columns(2)
         with c1:
             if st.button(f"CDB: R$ {aporte_sugerido:.2f}"):
                 dados['patrimonio'] += aporte_sugerido
-                dados['gastos_diarios'].append({"desc": f"Inv: CDB ({dados['quinzena']})", "valor": aporte_sugerido})
+                dados['gastos_diarios'].append({"desc": f"Inv: CDB ({q_label})", "valor": aporte_sugerido})
                 salvar_dados(dados)
                 st.rerun()
         with c2:
             if st.button(f"TESOURO: R$ {aporte_sugerido:.2f}"):
                 dados['patrimonio'] += aporte_sugerido
-                dados['gastos_diarios'].append({"desc": f"Inv: Tesouro ({dados['quinzena']})", "valor": aporte_sugerido})
+                dados['gastos_diarios'].append({"desc": f"Inv: Tesouro ({q_label})", "valor": aporte_sugerido})
                 salvar_dados(dados)
                 st.rerun()
 
         st.divider()
-
-        # --- CONTAS FIXAS ---
-        st.subheader("📝 Contas e Carnês")
-        with st.expander("+ Nova Conta"):
-            n_c = st.text_input("Item")
-            v_c_txt = st.text_input("Valor R$")
-            p_a = st.number_input("Parcela Atual", min_value=1, value=1)
-            p_t = st.number_input("Total Parcelas", min_value=1, value=1)
-            if st.button("Salvar Conta"):
-                v_c = format_num(v_c_txt)
-                if n_c and v_c > 0:
-                    dados['contas_fixas'].append({"nome": n_c, "valor": v_c, "atual": p_a, "total": p_t})
-                    salvar_dados(dados)
-                    st.rerun()
-
-        for i, c in enumerate(dados['contas_fixas']):
-            st.markdown(f"<div class='conta-card'><b>{c['nome']}</b> | {c['atual']}/{c['total']} | R$ {c['valor']:.2f}</div>", unsafe_allow_html=True)
-            col_p1, col_p2 = st.columns(2)
-            if col_p1.button(f"PAGAR PARCELA", key=f"pay_{i}"):
-                dados['gastos_diarios'].append({"desc": f"Pago: {c['nome']} ({c['atual']}/{c['total']})", "valor": c['valor']})
-                c['atual'] += 1
-                if c['atual'] > c['total']: dados['contas_fixas'].pop(i)
-                salvar_dados(dados)
-                st.rerun()
-            if col_p2.button("Excluir", key=f"del_c_{i}"):
-                dados['contas_fixas'].pop(i)
-                salvar_dados(dados)
-                st.rerun()
-
-        st.divider()
-
-        # --- GASTOS DIÁRIOS ---
         st.subheader("🛍️ Lançar Gasto")
-        g_d = st.text_input("Descrição do gasto")
-        g_v_txt = st.text_input("Valor R$", key="gv_mobile")
+        g_d = st.text_input("Descrição")
+        g_v_txt = st.text_input("Valor R$", key="gv_fix")
         if st.button("LANÇAR AGORA"):
             g_v = format_num(g_v_txt)
             if g_d and g_v > 0:
@@ -147,10 +119,9 @@ if verificar_login():
         st.subheader("💰 Patrimônio Total")
         st.title(f"R$ {dados['patrimonio']:.2f}")
         st.divider()
-        # Seção de Metas (Restaurada)
         with st.expander("+ Novo Objetivo"):
             m_n = st.text_input("Meta")
-            m_v_t = st.text_input("Alvo R$")
+            m_v_t = st.text_input("Alvo R$", key="meta_txt")
             if st.button("Salvar Meta"):
                 m_v = format_num(m_v_t)
                 dados['metas'].append({"nome": m_n, "alvo": m_v})
@@ -167,23 +138,12 @@ if verificar_login():
 
     with tab3:
         st.subheader("🔄 Virada de Quinzena")
-        st.write(f"Saldo atual para transporte: **R$ {saldo_livre:.2f}**")
-        
-        if st.button("FINALIZAR QUINZENA E TRANSPORTAR SALDO"):
-            # 1. Transporta o saldo para o campo Extra
+        st.write(f"Saldo para transportar: **R$ {saldo_livre:.2f}**")
+        if st.button("FINALIZAR E TRANSPORTAR"):
             dados["extra"] = saldo_livre
-            # 2. Reseta o salário para você digitar o novo
             dados["salario"] = 0.0
-            # 3. Limpa gastos da quinzena que passou
             dados["gastos_diarios"] = []
-            # 4. Alterna a quinzena
-            dados["quinzena"] = "2ª Quinzena" if dados["quinzena"] == "1ª Quinzena" else "1ª Quinzena"
-            
+            dados["quinzena"] = "2ª Quinzena" if dados.get("quinzena") == "1ª Quinzena" else "1ª Quinzena"
             salvar_dados(dados)
-            st.success("Saldo transportado e gastos limpos!")
-            st.rerun()
-
-        st.divider()
-        if st.sidebar.button("Sair"):
-            st.session_state["autenticado"] = False
+            st.success("Pronto! Saldo transportado.")
             st.rerun()
