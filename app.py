@@ -2,6 +2,7 @@ import streamlit as st
 import json
 import os
 import pandas as pd
+import plotly.express as px
 
 # --- CONFIGURAÇÕES DO APP ---
 st.set_page_config(page_title="Financeiro Pro", layout="centered", page_icon="💰")
@@ -13,22 +14,16 @@ st.markdown("""
     .st-emotion-cache-1r6slb0 { border-radius: 15px; border: 1px solid #30363d; padding: 20px; background-color: #161b22; }
     h1, h2, h3 { font-family: 'Inter', sans-serif; color: #58a6ff !important; font-weight: 700; }
     div[data-testid="stMetricValue"] { font-size: 1.8rem !important; color: #ffffff !important; }
-    .stButton>button { width: 100%; border-radius: 12px; height: 3em; font-weight: bold; border: none; transition: 0.3s; }
+    .stButton>button { width: 100%; border-radius: 12px; height: 3em; font-weight: bold; }
     </style>
     """, unsafe_allow_html=True)
 
 # --- FUNÇÕES DE DADOS ---
 def carregar_dados():
     modelo = {
-        "cdb_total": 0.0,
-        "tesouro_total": 0.0,
-        "gastos_diarios": [], 
-        "contas_fixas": [], 
-        "metas": [],
-        "salario": 0.0, 
-        "extra": 0.0, 
-        "pct": 10.0, 
-        "quinzena": "1ª Quinzena"
+        "cdb_total": 0.0, "tesouro_total": 0.0, "gastos_diarios": [], 
+        "contas_fixas": [], "metas": [], "salario": 0.0, "extra": 0.0, 
+        "pct_invest": 10.0, "quinzena": "1ª Quinzena"
     }
     if os.path.exists("dados.json"):
         try:
@@ -60,149 +55,154 @@ if not st.session_state.autenticado:
         u = st.text_input("Usuário")
         s = st.text_input("Senha", type="password")
         if st.button("Acessar"):
-            if u == "giovanne" and s == "8708":
+            if u == "admin" and s == "1234":
                 st.session_state.autenticado = True
                 st.rerun()
-            else:
-                st.error("Credenciais inválidas")
     st.stop()
 
-# --- CONTEÚDO PRINCIPAL ---
-st.markdown("<h1 style='text-align: center;'>📱 Financeiro Pro</h1>", unsafe_allow_html=True)
-
-# Cálculos Base
+# --- CÁLCULOS GERAIS ---
 total_gastos = sum(g['valor'] for g in dados['gastos_diarios'])
-saldo_livre = (dados['salario'] + dados['extra']) - total_gastos
-investimento_sugerido = ((dados['salario'] + dados['extra']) * (dados['pct'] / 100)) / 2
+receita_total = dados['salario'] + dados['extra']
+saldo_livre = receita_total - total_gastos
 patrimonio_total = dados['cdb_total'] + dados['tesouro_total']
+
+# --- INTERFACE ---
+st.markdown("<h1 style='text-align: center;'>📱 Financeiro Pro</h1>", unsafe_allow_html=True)
 
 col_m1, col_m2 = st.columns(2)
 col_m1.metric("Saldo Disponível", formatar_br(saldo_livre))
-col_m2.metric("Meta de Investimento", formatar_br(investimento_sugerido))
+col_m2.metric("Patrimônio Total", formatar_br(patrimonio_total))
 
-st.divider()
-
-# ABA ADICIONADA: Extrato Mensal
-tab1, tab2, tab3, tab4 = st.tabs(["💰 Fluxo Atual", "🎯 Ativos & Metas", "📝 Contas", "📋 Extrato Mensal"])
+tab1, tab2, tab3, tab4 = st.tabs(["💰 Fluxo", "🎯 Investimentos/Metas", "📝 Contas", "📊 Extrato"])
 
 with tab1:
+    # 1. ENTRADA (Meta % removida daqui)
     with st.container(border=True):
         st.subheader("📥 Entradas")
-        c1, c2, c3 = st.columns(3)
+        c1, c2 = st.columns(2)
         v_sal = c1.number_input("Salário", value=float(dados['salario']), format="%.2f")
         v_ext = c2.number_input("Extras", value=float(dados['extra']), format="%.2f")
-        v_pct = c3.number_input("Meta %", value=float(dados['pct']), format="%.1f")
-        
-        if (v_sal != dados['salario'] or v_ext != dados['extra'] or v_pct != dados['pct']):
-            dados.update({"salario": v_sal, "extra": v_ext, "pct": v_pct})
+        if (v_sal != dados['salario'] or v_ext != dados['extra']):
+            dados.update({"salario": v_sal, "extra": v_ext})
             salvar_dados(dados)
             st.rerun()
 
-    with st.container(border=True):
-        st.subheader("🏦 Investir")
-        ci1, ci2 = st.columns(2)
-        if ci1.button(f"CDB: {formatar_br(investimento_sugerido)}"):
-            dados['cdb_total'] += investimento_sugerido
-            dados['gastos_diarios'].append({"desc": "Aplicação CDB", "valor": investimento_sugerido, "cat": "Investimento"})
-            salvar_dados(dados)
-            st.rerun()
-        if ci2.button(f"TESOURO: {formatar_br(investimento_sugerido)}"):
-            dados['tesouro_total'] += investimento_sugerido
-            dados['gastos_diarios'].append({"desc": "Aplicação Tesouro", "valor": investimento_sugerido, "cat": "Investimento"})
-            salvar_dados(dados)
-            st.rerun()
-
+    # 3. GASTOS COM CONFIRMAÇÃO
     with st.container(border=True):
         st.subheader("🛒 Novo Gasto")
-        g_n = st.text_input("O que comprou?")
-        g_v = st.number_input("Valor R$", min_value=0.0, format="%.2f")
+        g_n = st.text_input("Descrição")
+        g_v = st.number_input("Valor R$", min_value=0.0, format="%.2f", key="g_val")
         g_c = st.selectbox("Categoria", ["Alimentação", "Transporte", "Lazer", "Saúde", "Casa", "Outros"])
+        
         if st.button("Registrar Gasto"):
             if g_n and g_v > 0:
-                dados['gastos_diarios'].append({"desc": g_n, "valor": g_v, "cat": g_c})
+                st.session_state.confirm_gasto = {"desc": g_n, "valor": g_v, "cat": g_c}
+        
+        if "confirm_gasto" in st.session_state:
+            st.warning(f"Confirmar gasto de {formatar_br(st.session_state.confirm_gasto['valor'])}?")
+            if st.button("SIM, REGISTRAR"):
+                dados['gastos_diarios'].append(st.session_state.confirm_gasto)
                 salvar_dados(dados)
+                del st.session_state.confirm_gasto
                 st.rerun()
 
 with tab2:
-    st.markdown("<h2 style='text-align: center;'>📈 Meus Ativos</h2>", unsafe_allow_html=True)
-    c_cdb, c_tes = st.columns(2)
-    with c_cdb:
-        with st.container(border=True):
-            st.markdown("### 💎 CDB")
-            st.markdown(f"**{formatar_br(dados['cdb_total'])}**")
-    with c_tes:
-        with st.container(border=True):
-            st.markdown("### 🏛️ Tesouro")
-            st.markdown(f"**{formatar_br(dados['tesouro_total'])}**")
-    
-    st.divider()
-    st.subheader("🎯 Metas")
-    with st.expander("+ Novo Objetivo"):
-        m_nome = st.text_input("Objetivo")
-        m_valor = st.number_input("Quanto custa? R$", min_value=0.0, format="%.2f")
-        if st.button("Criar Meta"):
-            if m_nome and m_valor > 0:
-                dados['metas'].append({"nome": m_nome, "alvo": m_valor})
+    # 2. INVESTIR COM % E CONFIRMAÇÃO
+    with st.container(border=True):
+        st.subheader("🏦 Investimento")
+        v_pct = st.slider("Escolha a % para investir", 0, 100, int(dados['pct_invest']))
+        valor_investir = (receita_total * (v_pct / 100)) / 2 # Dividido por 2 quinzenas
+        
+        st.write(f"Valor calculado para investir: **{formatar_br(valor_investir)}**")
+        
+        ci1, ci2 = st.columns(2)
+        if ci1.button("APLICAR CDB"):
+            st.session_state.tipo_inv = ("cdb_total", valor_investir, "CDB")
+        if ci2.button("APLICAR TESOURO"):
+            st.session_state.tipo_inv = ("tesouro_total", valor_investir, "Tesouro")
+            
+        if "tipo_inv" in st.session_state:
+            chave, valor, nome = st.session_state.tipo_inv
+            st.info(f"Confirmar aplicação de {formatar_br(valor)} no {nome}?")
+            if st.button("CONFIRMAR INVESTIMENTO"):
+                dados[chave] += valor
+                dados['gastos_diarios'].append({"desc": f"Investimento {nome}", "valor": valor, "cat": "Investimento"})
+                dados['pct_invest'] = float(v_pct)
                 salvar_dados(dados)
+                del st.session_state.tipo_inv
                 st.rerun()
 
+    # 4. STATUS DAS METAS COM % E FALTA
+    st.divider()
+    st.subheader("🎯 Objetivos")
     for i, m in enumerate(dados['metas']):
         with st.container(border=True):
-            st.markdown(f"**{m['nome']}** - {formatar_br(m['alvo'])}")
             prog = min(patrimonio_total / m['alvo'], 1.0) if m['alvo'] > 0 else 0
+            faltam = max(m['alvo'] - patrimonio_total, 0)
+            
+            st.write(f"**{m['nome']}**")
             st.progress(prog)
-            if st.button("Remover Meta", key=f"del_m_{i}"):
+            col_a, col_b = st.columns(2)
+            col_a.write(f"Status: **{prog*100:.1f}%**")
+            col_b.write(f"Falta: **{formatar_br(faltam)}**")
+            if st.button("Excluir Meta", key=f"del_m_{i}"):
                 dados['metas'].pop(i)
                 salvar_dados(dados)
                 st.rerun()
 
 with tab3:
-    st.subheader("📅 Parcelas")
-    with st.expander("+ Adicionar Conta"):
+    # 5. CONTAS COM CÁLCULO TOTAL E CONFIRMAÇÃO
+    st.subheader("📅 Gestão de Contas")
+    with st.expander("+ Adicionar Conta Parcelada"):
         nc = st.text_input("Item")
-        vc = st.number_input("Valor Parcela", min_value=0.0, format="%.2f")
-        p_at = st.number_input("Parc. Atual", 1, 100, 1)
-        p_to = st.number_input("Total Parc.", 1, 100, 1)
-        if st.button("Salvar"):
+        vc = st.number_input("Valor da Parcela", min_value=0.0, format="%.2f")
+        p_to = st.number_input("Total de Parcelas", 1, 100, 1)
+        valor_total_conta = vc * p_to
+        st.write(f"Valor Total do Contrato: **{formatar_br(valor_total_conta)}**")
+        
+        if st.button("Salvar Parcelamento"):
             if nc and vc > 0:
-                dados['contas_fixas'].append({"nome": nc, "valor": vc, "atual": p_at, "total": p_to})
+                dados['contas_fixas'].append({"nome": nc, "valor": vc, "atual": 1, "total": p_to})
                 salvar_dados(dados)
                 st.rerun()
 
     for i, c in enumerate(dados['contas_fixas']):
         with st.container(border=True):
-            st.markdown(f"**{c['nome']}** - {formatar_br(c['valor'])}")
-            st.progress(c['atual'] / c['total'])
+            st.write(f"**{c['nome']}** | Parcela: {formatar_br(c['valor'])}")
+            st.caption(f"Progresso: {c['atual']}/{c['total']} | Total: {formatar_br(c['valor'] * c['total'])}")
+            
             if st.button(f"PAGAR PARCELA {c['atual']}", key=f"pag_{i}"):
-                dados['gastos_diarios'].append({"desc": f"Parc. {c['nome']}", "valor": c['valor'], "cat": "Fixo"})
-                c['atual'] += 1
-                if c['atual'] > c['total']: dados['contas_fixas'].pop(i)
-                salvar_dados(dados)
-                st.rerun()
+                st.session_state.confirm_pag = i
+            
+            if st.session_state.get("confirm_pag") == i:
+                st.warning(f"Confirmar pagamento da parcela {c['atual']} de {c['nome']}?")
+                if st.button("CONFIRMAR PAGAMENTO"):
+                    dados['gastos_diarios'].append({"desc": f"Parc. {c['nome']}", "valor": c['valor'], "cat": "Fixo"})
+                    c['atual'] += 1
+                    if c['atual'] > c['total']: dados['contas_fixas'].pop(i)
+                    salvar_dados(dados)
+                    del st.session_state.confirm_pag
+                    st.rerun()
 
-# NOVA ABA IMPLEMENTADA
 with tab4:
-    st.subheader("📋 Extrato de Gastos")
+    # 6. EXTRATO COM GRÁFICO
+    st.subheader("📋 Relatório Mensal")
     if dados['gastos_diarios']:
-        # Criar Tabela organizada
         df = pd.DataFrame(dados['gastos_diarios'])
-        df.columns = ["Descrição", "Valor (R$)", "Categoria"]
         
-        # Mostrar o total gasto no topo do extrato
-        st.markdown(f"### Total Gasto nesta Quinzena: <span style='color:#ff4b4b'>{formatar_br(total_gastos)}</span>", unsafe_allow_html=True)
+        # Gráfico por Categoria
+        fig = px.pie(df, values='valor', names='cat', title="Distribuição de Gastos", hole=0.3)
+        st.plotly_chart(fig, use_container_width=True)
         
-        # Exibir a tabela
-        st.dataframe(df, use_container_width=True, hide_index=True)
-        
-        st.divider()
-        st.caption("Dica: Use o botão de Virar Quinzena no menu lateral para limpar este extrato ao mudar de mês.")
+        st.write("### Detalhes")
+        st.dataframe(df, use_container_width=True)
+        st.metric("Total Gasto", formatar_br(total_gastos))
     else:
-        st.info("Nenhum gasto registrado até agora.")
+        st.info("Sem dados de gastos.")
 
 # Sidebar
 with st.sidebar:
     st.title("⚙️ Sistema")
-    st.write(f"Período: **{dados['quinzena']}**")
     if st.button("Sair"):
         st.session_state.autenticado = False
         st.rerun()
@@ -211,12 +211,5 @@ with st.sidebar:
         dados["extra"] = saldo_livre
         dados["salario"] = 0.0
         dados["gastos_diarios"] = []
-        dados["quinzena"] = "2ª Quinzena" if dados["quinzena"] == "1ª Quinzena" else "1ª Quinzena"
         salvar_dados(dados)
-        st.success("Dados resetados para a nova quinzena!")
         st.rerun()
-    st.divider()
-    if st.checkbox("Liberar Reset"):
-        if st.button("APAGAR TUDO"):
-            if os.path.exists("dados.json"): os.remove("dados.json")
-            st.rerun()
