@@ -5,7 +5,6 @@ import pandas as pd
 import plotly.express as px
 from datetime import datetime
 import hashlib
-import time
 
 # =========================================================
 # CONFIG
@@ -13,52 +12,49 @@ import time
 
 st.set_page_config(
     page_title="Financeiro Pro",
-    layout="wide",
+    layout="centered",
     page_icon="💰"
 )
 
 # =========================================================
-# CSS PREMIUM
+# CSS
 # =========================================================
 
 st.markdown("""
 <style>
 
-.stApp {
+.stApp{
     background:
-    radial-gradient(circle at top left, #1e293b, #0f172a);
-    color: white;
+    linear-gradient(135deg,#0f172a,#111827);
 }
 
-/* METRICS */
+/* CARDS */
 
-[data-testid="stMetric"] {
+[data-testid="stMetric"]{
 
-    background: rgba(30,41,59,0.75);
+    background:rgba(17,24,39,0.95);
 
-    border: 1px solid rgba(255,255,255,0.08);
+    border:1px solid rgba(255,255,255,0.08);
 
-    padding: 20px;
+    padding:18px;
 
-    border-radius: 22px;
+    border-radius:22px;
 
     box-shadow:
     0px 8px 25px rgba(0,0,0,0.35);
-
-    backdrop-filter: blur(10px);
 }
 
 /* BOTÕES */
 
-.stButton > button {
+.stButton > button{
 
     width:100%;
+
+    height:48px;
 
     border:none;
 
     border-radius:14px;
-
-    height:50px;
 
     background:
     linear-gradient(90deg,#2563eb,#3b82f6);
@@ -70,47 +66,35 @@ st.markdown("""
     transition:0.3s;
 }
 
-.stButton > button:hover {
+.stButton > button:hover{
 
     transform:translateY(-2px);
 
     box-shadow:
-    0 8px 20px rgba(37,99,235,0.4);
+    0px 8px 20px rgba(37,99,235,0.35);
 }
 
 /* INPUTS */
 
 .stTextInput input,
-.stNumberInput input {
+.stNumberInput input{
 
     background:#1e293b;
 
     color:white;
 
-    border-radius:12px;
+    border-radius:14px;
 
     border:1px solid #334155;
 }
 
-/* TABS */
+/* SELECT */
 
-.stTabs [data-baseweb="tab"] {
+.stSelectbox div[data-baseweb="select"]{
 
-    font-size:16px;
+    background:#1e293b;
 
-    padding:12px;
-
-    border-radius:12px;
-}
-
-/* SIDEBAR */
-
-section[data-testid="stSidebar"] {
-
-    background:#111827;
-
-    border-right:
-    1px solid rgba(255,255,255,0.08);
+    border-radius:14px;
 }
 
 </style>
@@ -123,14 +107,16 @@ section[data-testid="stSidebar"] {
 def carregar_dados():
 
     modelo = {
+
+        "saldo_conta": 0.0,
+
         "cdb_total": 0.0,
+
         "tesouro_total": 0.0,
+
         "gastos_diarios": [],
-        "contas_fixas": [],
-        "metas": [],
-        "salario": 0.0,
-        "extra": 0.0,
-        "pct_invest": 10.0
+
+        "metas": []
     }
 
     if os.path.exists("dados.json"):
@@ -139,14 +125,14 @@ def carregar_dados():
 
             with open("dados.json", "r") as f:
 
-                d = json.load(f)
+                dados = json.load(f)
 
                 for k, v in modelo.items():
 
-                    if k not in d:
-                        d[k] = v
+                    if k not in dados:
+                        dados[k] = v
 
-                return d
+                return dados
 
         except:
             return modelo
@@ -161,9 +147,9 @@ def salvar_dados(dados):
 def formatar_br(valor):
 
     return f"R$ {float(valor):,.2f}"\
-        .replace(',', 'X')\
-        .replace('.', ',')\
-        .replace('X', '.')
+        .replace(",", "X")\
+        .replace(".", ",")\
+        .replace("X", ".")
 
 # =========================================================
 # DADOS
@@ -182,25 +168,30 @@ if not st.session_state.autenticado:
 
     st.markdown("""
     <div style="
-    max-width:450px;
-    margin:auto;
-    margin-top:100px;
-    padding:35px;
     background:#111827;
+    padding:35px;
     border-radius:25px;
+    margin-top:80px;
     border:1px solid rgba(255,255,255,0.08);
     ">
     <h1 style="text-align:center;">
     🔐 Financeiro Pro
     </h1>
-    <p style="text-align:center;color:gray;">
-    Acesse sua central financeira
+    <p style="
+    text-align:center;
+    color:gray;
+    ">
+    Faça login para continuar
     </p>
     </div>
     """, unsafe_allow_html=True)
 
-    u = st.text_input("Usuário")
-    s = st.text_input("Senha", type="password")
+    usuario = st.text_input("Usuário")
+
+    senha = st.text_input(
+        "Senha",
+        type="password"
+    )
 
     senha_correta = hashlib.sha256(
         "8708".encode()
@@ -209,14 +200,14 @@ if not st.session_state.autenticado:
     if st.button("Entrar"):
 
         senha_input = hashlib.sha256(
-            s.encode()
+            senha.encode()
         ).hexdigest()
 
-        if u == "giovanne" and senha_input == senha_correta:
+        if usuario == "giovanne" and senha_input == senha_correta:
 
             st.session_state.autenticado = True
 
-            st.toast("Login realizado!", icon="✅")
+            st.success("Login realizado!")
 
             st.rerun()
 
@@ -230,31 +221,18 @@ if not st.session_state.autenticado:
 # =========================================================
 
 total_gastos = sum(
-    g.get('valor', 0)
+    g['valor']
     for g in dados['gastos_diarios']
 )
-
-receita_total = (
-    dados['salario'] +
-    dados['extra']
-)
-
-saldo_livre = receita_total - total_gastos
 
 total_investido = (
     dados['cdb_total'] +
     dados['tesouro_total']
 )
 
-media_gastos = total_gastos / max(
-    len(dados['gastos_diarios']),
-    1
-)
-
-dias_restantes = 15
-
-previsao = saldo_livre - (
-    media_gastos * dias_restantes
+saldo_livre = (
+    dados['saldo_conta']
+    - total_gastos
 )
 
 # =========================================================
@@ -266,16 +244,16 @@ st.markdown("""
 background:
 linear-gradient(135deg,#1e293b,#0f172a);
 
-padding:30px;
+padding:28px;
 
 border-radius:25px;
 
-margin-bottom:25px;
+margin-bottom:20px;
 
 border:1px solid rgba(255,255,255,0.08);
 
 box-shadow:
-0 8px 25px rgba(0,0,0,0.35);
+0px 8px 25px rgba(0,0,0,0.35);
 ">
 
 <h1 style="margin:0;">
@@ -283,138 +261,108 @@ box-shadow:
 </h1>
 
 <p style="
-color:#94a3b8;
 margin-top:5px;
+color:#94a3b8;
 ">
-Controle inteligente das suas finanças
+Seu controle financeiro inteligente
 </p>
 
 </div>
 """, unsafe_allow_html=True)
 
 # =========================================================
-# METRICS
+# DASHBOARD
 # =========================================================
 
-c1, c2, c3 = st.columns(3)
+c1, c2 = st.columns(2)
 
-with c1:
-    st.metric(
-        "💰 Saldo Livre",
-        formatar_br(saldo_livre)
-    )
+c1.metric(
+    "💳 Saldo em Conta",
+    formatar_br(dados['saldo_conta'])
+)
 
-with c2:
-    st.metric(
-        "📈 Investido",
-        formatar_br(total_investido)
-    )
+c2.metric(
+    "💸 Livre",
+    formatar_br(saldo_livre)
+)
 
-with c3:
-    st.metric(
-        "💸 Gastos",
-        formatar_br(total_gastos)
-    )
+c3, c4 = st.columns(2)
 
-# =========================================================
-# PREVISÃO
-# =========================================================
+c3.metric(
+    "📈 Investido",
+    formatar_br(total_investido)
+)
 
-if previsao < 0:
-
-    st.error(
-        f"⚠️ Previsão negativa em 15 dias: "
-        f"{formatar_br(previsao)}"
-    )
-
-else:
-
-    st.success(
-        f"📊 Previsão positiva para 15 dias: "
-        f"{formatar_br(previsao)}"
-    )
-
-# =========================================================
-# AÇÕES RÁPIDAS
-# =========================================================
-
-st.subheader("⚡ Ações Rápidas")
-
-a1, a2, a3 = st.columns(3)
-
-with a1:
-
-    if st.button("💸 Novo Gasto"):
-        st.toast("Use a aba Fluxo")
-
-with a2:
-
-    if st.button("📈 Investir"):
-        st.toast("Use a aba Investimentos")
-
-with a3:
-
-    if st.button("🎯 Nova Meta"):
-        st.toast("Use a aba Metas")
+c4.metric(
+    "🧾 Gastos",
+    formatar_br(total_gastos)
+)
 
 # =========================================================
 # TABS
 # =========================================================
 
 tab1, tab2, tab3, tab4 = st.tabs([
-    "💰 Fluxo",
-    "🎯 Investimentos",
-    "📝 Parcelas",
+
+    "💳 Conta",
+
+    "💸 Gastos",
+
+    "📈 Investimentos",
+
     "📊 Relatórios"
 ])
 
 # =========================================================
-# TAB FLUXO
+# CONTA
 # =========================================================
 
 with tab1:
 
-    st.subheader("📥 Receitas")
+    st.subheader("💳 Saldo Bancário")
 
-    r1, r2 = st.columns(2)
+    saldo = st.number_input(
 
-    salario = r1.number_input(
-        "Salário",
-        value=float(dados['salario']),
+        "Saldo Atual",
+
+        value=float(dados['saldo_conta']),
+
         format="%.2f"
     )
 
-    extra = r2.number_input(
-        "Extras",
-        value=float(dados['extra']),
-        format="%.2f"
-    )
+    if st.button("Salvar Saldo"):
 
-    if st.button("Salvar Receitas"):
-
-        dados['salario'] = salario
-        dados['extra'] = extra
+        dados['saldo_conta'] = saldo
 
         salvar_dados(dados)
 
-        st.success("Receitas atualizadas!")
+        st.success("Saldo atualizado!")
 
         st.rerun()
 
-    st.divider()
+# =========================================================
+# GASTOS
+# =========================================================
+
+with tab2:
 
     st.subheader("💸 Registrar Gasto")
 
-    g_n = st.text_input("Descrição")
+    desc = st.text_input("Descrição")
 
-    g_v = st.number_input(
+    valor = st.number_input(
+
         "Valor",
+
         min_value=0.0,
+
         format="%.2f"
     )
 
-    g_c = st.selectbox(
+    categoria = st.selectbox(
+
         "Categoria",
+
         [
             "Alimentação",
             "Transporte",
@@ -427,98 +375,132 @@ with tab1:
 
     if st.button("Salvar Gasto"):
 
-        if g_n and g_v > 0:
+        if desc and valor > 0:
 
             dados['gastos_diarios'].append({
 
                 "data":
                 datetime.now().strftime("%d/%m %H:%M"),
 
-                "desc": g_n,
+                "desc": desc,
 
-                "valor": g_v,
+                "valor": valor,
 
-                "cat": g_c
+                "cat": categoria
             })
 
             salvar_dados(dados)
 
-            st.toast("Gasto salvo!", icon="✅")
+            st.success("Gasto registrado!")
 
             st.rerun()
 
+    st.divider()
+
+    st.subheader("🧾 Últimos Gastos")
+
+    ultimos = dados['gastos_diarios'][-5:][::-1]
+
+    for g in ultimos:
+
+        st.markdown(f"""
+        <div style="
+        background:#111827;
+
+        padding:18px;
+
+        border-radius:18px;
+
+        margin-bottom:10px;
+
+        border-left:5px solid #ef4444;
+        ">
+
+        <h4 style="margin:0;">
+        {g['desc']}
+        </h4>
+
+        <p style="
+        color:gray;
+        margin:0;
+        ">
+        {g['cat']}
+        </p>
+
+        <h3 style="
+        margin-top:8px;
+        ">
+        {formatar_br(g['valor'])}
+        </h3>
+
+        </div>
+        """, unsafe_allow_html=True)
+
 # =========================================================
-# TAB INVESTIMENTOS
+# INVESTIMENTOS
 # =========================================================
 
-with tab2:
+with tab3:
 
-    st.subheader("📈 Aplicar Investimento")
+    st.subheader("📈 Carteira")
 
-    v_pct = st.slider(
-        "Porcentagem da Receita",
-        0,
-        100,
-        int(dados['pct_invest'])
+    i1, i2, i3 = st.columns(3)
+
+    i1.metric(
+        "CDB",
+        formatar_br(dados['cdb_total'])
     )
 
-    valor_aplicar = (
-        receita_total *
-        (v_pct / 100)
-    ) / 2
-
-    st.info(
-        f"Valor sugerido: "
-        f"{formatar_br(valor_aplicar)}"
+    i2.metric(
+        "Tesouro",
+        formatar_br(dados['tesouro_total'])
     )
 
-    i1, i2 = st.columns(2)
+    i3.metric(
+        "Total",
+        formatar_br(total_investido)
+    )
 
-    with i1:
+    st.divider()
 
-        if st.button("Aplicar em CDB"):
+    st.subheader("💵 Aplicar Investimento")
 
-            dados['cdb_total'] += valor_aplicar
+    valor_inv = st.number_input(
 
-            dados['gastos_diarios'].append({
+        "Valor para investir",
 
-                "data":
-                datetime.now().strftime("%d/%m"),
+        min_value=0.0,
 
-                "desc": "Aplicação CDB",
+        format="%.2f"
+    )
 
-                "valor": valor_aplicar,
+    tipo = st.selectbox(
 
-                "cat": "Investimento"
-            })
+        "Tipo",
+
+        [
+            "CDB",
+            "Tesouro"
+        ]
+    )
+
+    if st.button("Aplicar"):
+
+        if valor_inv > 0:
+
+            if tipo == "CDB":
+
+                dados['cdb_total'] += valor_inv
+
+            else:
+
+                dados['tesouro_total'] += valor_inv
+
+            dados['saldo_conta'] -= valor_inv
 
             salvar_dados(dados)
 
-            st.success("Aplicado no CDB!")
-
-            st.rerun()
-
-    with i2:
-
-        if st.button("Aplicar Tesouro"):
-
-            dados['tesouro_total'] += valor_aplicar
-
-            dados['gastos_diarios'].append({
-
-                "data":
-                datetime.now().strftime("%d/%m"),
-
-                "desc": "Aplicação Tesouro",
-
-                "valor": valor_aplicar,
-
-                "cat": "Investimento"
-            })
-
-            salvar_dados(dados)
-
-            st.success("Aplicado no Tesouro!")
+            st.success("Investimento realizado!")
 
             st.rerun()
 
@@ -526,10 +508,14 @@ with tab2:
 
     st.subheader("🎯 Metas")
 
-    m_n = st.text_input("Nome da Meta")
+    nome_meta = st.text_input(
+        "Nome da Meta"
+    )
 
-    m_v = st.number_input(
+    valor_meta = st.number_input(
+
         "Valor da Meta",
+
         min_value=0.0
     )
 
@@ -537,9 +523,9 @@ with tab2:
 
         dados['metas'].append({
 
-            "nome": m_n,
+            "nome": nome_meta,
 
-            "alvo": m_v
+            "alvo": valor_meta
         })
 
         salvar_dados(dados)
@@ -548,88 +534,38 @@ with tab2:
 
         st.rerun()
 
-    for i, m in enumerate(dados['metas']):
+    for meta in dados['metas']:
 
         progresso = min(
-            total_investido / m['alvo'],
+            total_investido / meta['alvo'],
             1.0
         )
 
         st.markdown(f"""
         <div style="
         background:#111827;
+
         padding:20px;
+
         border-radius:20px;
-        margin-bottom:15px;
+
+        margin-bottom:12px;
         ">
-        <h3>{m['nome']}</h3>
+
+        <h3>{meta['nome']}</h3>
+
         <p>
         Meta:
-        {formatar_br(m['alvo'])}
+        {formatar_br(meta['alvo'])}
         </p>
+
         </div>
         """, unsafe_allow_html=True)
 
         st.progress(progresso)
 
 # =========================================================
-# TAB PARCELAS
-# =========================================================
-
-with tab3:
-
-    st.subheader("📝 Parcelamentos")
-
-    nome_parc = st.text_input("Nome")
-
-    valor_parc = st.number_input(
-        "Valor Parcela",
-        min_value=0.0
-    )
-
-    total_parc = st.number_input(
-        "Qtd Parcelas",
-        1,
-        100
-    )
-
-    if st.button("Adicionar Parcela"):
-
-        dados['contas_fixas'].append({
-
-            "nome": nome_parc,
-
-            "valor": valor_parc,
-
-            "atual": 1,
-
-            "total": total_parc
-        })
-
-        salvar_dados(dados)
-
-        st.success("Parcela adicionada!")
-
-        st.rerun()
-
-    for c in dados['contas_fixas']:
-
-        st.markdown(f"""
-        <div style="
-        background:#111827;
-        padding:18px;
-        border-radius:18px;
-        margin-bottom:12px;
-        ">
-        <h4>{c['nome']}</h4>
-        <p>
-        {c['atual']} / {c['total']}
-        </p>
-        </div>
-        """, unsafe_allow_html=True)
-
-# =========================================================
-# TAB RELATÓRIOS
+# RELATÓRIOS
 # =========================================================
 
 with tab4:
@@ -638,28 +574,9 @@ with tab4:
 
     if dados['gastos_diarios']:
 
-        with st.spinner(
-            "Carregando relatórios..."
-        ):
-            time.sleep(1)
-
         df = pd.DataFrame(
             dados['gastos_diarios']
         )
-
-        filtro = st.selectbox(
-            "Categoria",
-            ["Todos"] +
-            list(df['cat'].unique())
-        )
-
-        if filtro != "Todos":
-
-            df = df[
-                df['cat'] == filtro
-            ]
-
-        # DONUT
 
         fig = px.pie(
 
@@ -671,15 +588,13 @@ with tab4:
 
             hole=0.65,
 
-            title="Distribuição de Gastos"
+            title="Distribuição dos Gastos"
         )
 
         st.plotly_chart(
             fig,
             use_container_width=True
         )
-
-        # LINHA
 
         try:
 
@@ -697,7 +612,7 @@ with tab4:
                 'mes'
             )['valor'].sum().reset_index()
 
-            fig2 = px.line(
+            fig2 = px.bar(
 
                 graf_mes,
 
@@ -705,9 +620,7 @@ with tab4:
 
                 y='valor',
 
-                markers=True,
-
-                title='📈 Evolução dos Gastos'
+                title='📈 Gastos Mensais'
             )
 
             st.plotly_chart(
@@ -717,12 +630,6 @@ with tab4:
 
         except:
             pass
-
-        # INSIGHTS
-
-        st.subheader(
-            "🤖 Resumo Inteligente"
-        )
 
         categoria_top = df.groupby(
             'cat'
@@ -737,98 +644,13 @@ with tab4:
 Maior categoria:
 {categoria_top}
 
-Maior gasto:
+Total:
 {formatar_br(valor_top)}
 
-Média por lançamento:
+Média:
 {formatar_br(df['valor'].mean())}
 
-Total movimentado:
-{formatar_br(df['valor'].sum())}
-
 """)
-
-        # EXTRATO
-
-        st.subheader(
-            "🧾 Últimos Lançamentos"
-        )
-
-        df_display = df.tail(10)[::-1]
-
-        for i, row in df_display.iterrows():
-
-            cor = "#ef4444"
-
-            if row['cat'] == "Investimento":
-                cor = "#3b82f6"
-
-            st.markdown(f"""
-            <div style="
-            background:#161b22;
-
-            padding:18px;
-
-            border-radius:18px;
-
-            margin-bottom:12px;
-
-            border-left:
-            6px solid {cor};
-            ">
-
-            <div style="
-            display:flex;
-
-            justify-content:space-between;
-
-            align-items:center;
-            ">
-
-            <div>
-
-            <h4 style="margin:0;">
-            {row['desc']}
-            </h4>
-
-            <p style="
-            margin:0;
-            color:gray;
-            ">
-            {row['cat']}
-            </p>
-
-            </div>
-
-            <div>
-
-            <h3 style="margin:0;">
-            {formatar_br(row['valor'])}
-            </h3>
-
-            </div>
-
-            </div>
-
-            </div>
-            """, unsafe_allow_html=True)
-
-        # DOWNLOAD
-
-        csv = df.to_csv(
-            index=False
-        ).encode('utf-8')
-
-        st.download_button(
-
-            "📥 Baixar Extrato",
-
-            csv,
-
-            "extrato.csv",
-
-            "text/csv"
-        )
 
 # =========================================================
 # SIDEBAR
@@ -846,22 +668,25 @@ with st.sidebar:
 
     st.divider()
 
-    if st.checkbox(
-        "Habilitar Reset"
-    ):
+    st.subheader("🗑️ Reset")
 
-        if st.button(
-            "🗑️ Zerar Quinzena"
-        ):
+    if st.button("Resetar Tudo"):
 
-            dados[
-                "gastos_diarios"
-            ] = []
+        dados = {
 
-            salvar_dados(dados)
+            "saldo_conta": 0.0,
 
-            st.warning(
-                "Dados resetados!"
-            )
+            "cdb_total": 0.0,
 
-            st.rerun()
+            "tesouro_total": 0.0,
+
+            "gastos_diarios": [],
+
+            "metas": []
+        }
+
+        salvar_dados(dados)
+
+        st.warning("Tudo resetado!")
+
+        st.rerun()
