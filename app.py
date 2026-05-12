@@ -6,7 +6,7 @@ import pandas as pd
 # --- CONFIGURAÇÕES DO APP ---
 st.set_page_config(page_title="Financeiro Pro", layout="centered", page_icon="💰")
 
-# --- ESTILO CSS PARA DESIGN MODERNO ---
+# --- ESTILO CSS ---
 st.markdown("""
     <style>
     .main { background-color: #0d1117; }
@@ -14,14 +14,14 @@ st.markdown("""
     h1, h2, h3 { font-family: 'Inter', sans-serif; color: #58a6ff !important; font-weight: 700; }
     div[data-testid="stMetricValue"] { font-size: 1.8rem !important; color: #ffffff !important; }
     .stButton>button { width: 100%; border-radius: 12px; height: 3em; font-weight: bold; border: none; transition: 0.3s; }
-    .btn-investir { background-color: #238636 !important; color: white !important; }
     </style>
     """, unsafe_allow_html=True)
 
 # --- FUNÇÕES DE DADOS ---
 def carregar_dados():
     modelo = {
-        "patrimonio": 0.0, 
+        "cdb_total": 0.0,
+        "tesouro_total": 0.0,
         "gastos_diarios": [], 
         "contas_fixas": [], 
         "metas": [],
@@ -59,8 +59,8 @@ if not st.session_state.autenticado:
     with st.container(border=True):
         u = st.text_input("Usuário")
         s = st.text_input("Senha", type="password")
-        if st.button("Acessar Sistema"):
-            if u == "giovanne" and s == "8708":
+        if st.button("Acessar"):
+            if u == "admin" and s == "1234":
                 st.session_state.autenticado = True
                 st.rerun()
             else:
@@ -74,6 +74,7 @@ st.markdown("<h1 style='text-align: center;'>📱 Financeiro Pro</h1>", unsafe_a
 total_gastos = sum(g['valor'] for g in dados['gastos_diarios'])
 saldo_livre = (dados['salario'] + dados['extra']) - total_gastos
 investimento_sugerido = ((dados['salario'] + dados['extra']) * (dados['pct'] / 100)) / 2
+patrimonio_total = dados['cdb_total'] + dados['tesouro_total']
 
 col_m1, col_m2 = st.columns(2)
 col_m1.metric("Saldo Disponível", formatar_br(saldo_livre))
@@ -81,7 +82,7 @@ col_m2.metric("Meta de Investimento", formatar_br(investimento_sugerido))
 
 st.divider()
 
-tab1, tab2, tab3 = st.tabs(["💰 Fluxo Atual", "🏦 Cofre & Metas", "📝 Contas/Parcelas"])
+tab1, tab2, tab3 = st.tabs(["💰 Fluxo Atual", "🎯 Investimentos & Metas", "📝 Contas/Parcelas"])
 
 with tab1:
     # --- CARD ENTRADAS ---
@@ -100,21 +101,20 @@ with tab1:
     # --- CARD INVESTIMENTOS ---
     with st.container(border=True):
         st.subheader("🏦 Realizar Investimento")
-        st.caption("Ao investir, o valor sai do saldo disponível e vai para o seu Cofre.")
         ci1, ci2 = st.columns(2)
         
-        if ci1.button(f"CDB: {formatar_br(investimento_sugerido)}"):
-            dados['patrimonio'] += investimento_sugerido
-            dados['gastos_diarios'].append({"desc": "Investimento CDB", "valor": investimento_sugerido, "cat": "Investimento"})
+        if ci1.button(f"INVESTIR CDB: {formatar_br(investimento_sugerido)}"):
+            dados['cdb_total'] += investimento_sugerido
+            dados['gastos_diarios'].append({"desc": "Aplicação CDB", "valor": investimento_sugerido, "cat": "Investimento"})
             salvar_dados(dados)
-            st.toast("Valor guardado no CDB!")
+            st.toast("Saldo de CDB atualizado!")
             st.rerun()
             
-        if ci2.button(f"TESOURO: {formatar_br(investimento_sugerido)}"):
-            dados['patrimonio'] += investimento_sugerido
-            dados['gastos_diarios'].append({"desc": "Investimento Tesouro", "valor": investimento_sugerido, "cat": "Investimento"})
+        if ci2.button(f"INVESTIR TESOURO: {formatar_br(investimento_sugerido)}"):
+            dados['tesouro_total'] += investimento_sugerido
+            dados['gastos_diarios'].append({"desc": "Aplicação Tesouro", "valor": investimento_sugerido, "cat": "Investimento"})
             salvar_dados(dados)
-            st.toast("Valor guardado no Tesouro!")
+            st.toast("Saldo de Tesouro atualizado!")
             st.rerun()
 
     # --- NOVO GASTO ---
@@ -130,57 +130,60 @@ with tab1:
                 st.rerun()
 
 with tab2:
-    # --- ABA DO COFRE ---
-    st.markdown("<h2 style='text-align: center;'>🔒 Meu Cofre</h2>", unsafe_allow_html=True)
-    st.markdown(f"<div style='text-align: center; font-size: 32px;'>Total Guardado: <b>{formatar_br(dados['patrimonio'])}</b></div>", unsafe_allow_html=True)
+    # --- VISUALIZAÇÃO POR ATIVO ---
+    st.markdown("<h2 style='text-align: center;'>📈 Meus Ativos</h2>", unsafe_allow_html=True)
+    
+    c_cdb, c_tes = st.columns(2)
+    with c_cdb:
+        with st.container(border=True):
+            st.markdown("### 💎 CDB")
+            st.markdown(f"**{formatar_br(dados['cdb_total'])}**")
+    with c_tes:
+        with st.container(border=True):
+            st.markdown("### 🏛️ Tesouro")
+            st.markdown(f"**{formatar_br(dados['tesouro_total'])}**")
+
     st.divider()
 
     # Gerenciar Metas
-    st.subheader("🎯 Acompanhamento de Metas")
-    with st.expander("+ Criar Novo Objetivo"):
-        m_nome = st.text_input("Nome do Objetivo (Ex: Carro)")
-        m_valor = st.number_input("Valor Total da Meta R$", min_value=0.0, format="%.2f")
-        if st.button("Salvar Meta"):
+    st.subheader("🎯 Progresso das Metas")
+    with st.expander("+ Novo Objetivo"):
+        m_nome = st.text_input("Objetivo")
+        m_valor = st.number_input("Quanto custa? R$", min_value=0.0, format="%.2f")
+        if st.button("Criar Meta"):
             if m_nome and m_valor > 0:
                 dados['metas'].append({"nome": m_nome, "alvo": m_valor})
                 salvar_dados(dados)
                 st.rerun()
 
-    # Exibição das Metas
-    if not dados['metas']:
-        st.info("Você ainda não cadastrou metas.")
-    else:
-        for i, m in enumerate(dados['metas']):
-            with st.container(border=True):
-                col_a, col_b = st.columns([3, 1])
-                col_a.markdown(f"### {m['nome']}")
-                col_b.markdown(f"**{formatar_br(m['alvo'])}**")
-                
-                # Progresso
-                progresso = min(dados['patrimonio'] / m['alvo'], 1.0) if m['alvo'] > 0 else 0
-                st.progress(progresso)
-                
-                faltam = max(m['alvo'] - dados['patrimonio'], 0)
-                if faltam > 0:
-                    st.write(f"Faltam **{formatar_br(faltam)}** para atingir este objetivo.")
-                else:
-                    st.success("🎉 Meta Atingida!")
-                
-                if st.button("Remover Meta", key=f"del_meta_{i}"):
-                    dados['metas'].pop(i)
-                    salvar_dados(dados)
-                    st.rerun()
+    for i, m in enumerate(dados['metas']):
+        with st.container(border=True):
+            col_a, col_b = st.columns([3, 1])
+            col_a.markdown(f"### {m['nome']}")
+            col_b.markdown(f"**{formatar_br(m['alvo'])}**")
+            
+            progresso = min(patrimonio_total / m['alvo'], 1.0) if m['alvo'] > 0 else 0
+            st.progress(progresso)
+            
+            faltam = max(m['alvo'] - patrimonio_total, 0)
+            if faltam > 0:
+                st.write(f"Faltam **{formatar_br(faltam)}** (Considerando CDB + Tesouro)")
+            else:
+                st.success("🎉 Objetivo alcançado!")
+            
+            if st.button("Excluir Objetivo", key=f"del_m_{i}"):
+                dados['metas'].pop(i)
+                salvar_dados(dados)
+                st.rerun()
 
 with tab3:
-    # --- CONTAS E PARCELAS ---
     st.subheader("📅 Gestão de Parcelas")
     with st.expander("+ Adicionar Conta Parcelada"):
-        nc = st.text_input("Item", placeholder="Ex: iPhone")
-        vc = st.number_input("Valor Parcela R$", min_value=0.0, format="%.2f")
-        cp1, cp2 = st.columns(2)
-        p_at = cp1.number_input("Parc. Atual", 1, 100, 1)
-        p_to = cp2.number_input("Total Parc.", 1, 100, 1)
-        if st.button("Salvar Parcelamento"):
+        nc = st.text_input("Item")
+        vc = st.number_input("Valor Parcela", min_value=0.0, format="%.2f")
+        p_at = st.number_input("Parc. Atual", 1, 100, 1)
+        p_to = st.number_input("Total Parc.", 1, 100, 1)
+        if st.button("Salvar"):
             if nc and vc > 0:
                 dados['contas_fixas'].append({"nome": nc, "valor": vc, "atual": p_at, "total": p_to})
                 salvar_dados(dados)
@@ -188,12 +191,11 @@ with tab3:
 
     for i, c in enumerate(dados['contas_fixas']):
         with st.container(border=True):
-            col_a, col_b = st.columns([2, 1])
-            col_a.markdown(f"**{c['nome']}** ({c['atual']}/{c['total']})")
-            col_b.markdown(formatar_br(c['valor']))
+            st.markdown(f"**{c['nome']}** - {formatar_br(c['valor'])}")
             st.progress(c['atual'] / c['total'])
+            st.caption(f"Parcela {c['atual']} de {c['total']}")
             
-            if st.button(f"PAGAR PARCELA {c['atual']}", key=f"pagar_{i}"):
+            if st.button(f"PAGAR PARCELA {c['atual']}", key=f"pag_{i}"):
                 dados['gastos_diarios'].append({"desc": f"Parc. {c['nome']}", "valor": c['valor'], "cat": "Fixo"})
                 c['atual'] += 1
                 if c['atual'] > c['total']:
@@ -204,7 +206,6 @@ with tab3:
 # Sidebar
 with st.sidebar:
     st.title("⚙️ Sistema")
-    st.write(f"Quinzena: **{dados['quinzena']}**")
     if st.button("Sair"):
         st.session_state.autenticado = False
         st.rerun()
@@ -218,6 +219,6 @@ with st.sidebar:
         st.rerun()
     st.divider()
     if st.checkbox("Liberar Reset"):
-        if st.button("LIMPAR TUDO"):
+        if st.button("APAGAR TUDO"):
             if os.path.exists("dados.json"): os.remove("dados.json")
             st.rerun()
