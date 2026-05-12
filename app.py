@@ -21,18 +21,26 @@ st.markdown("""
 # --- FUNÇÕES DE DADOS ---
 def carregar_dados():
     modelo = {
-        "cdb_total": 0.0, "tesouro_total": 0.0, "gastos_diarios": [], 
-        "contas_fixas": [], "metas": [], "salario": 0.0, "extra": 0.0, 
+        "cdb_total": 0.0, 
+        "tesouro_total": 0.0, 
+        "gastos_diarios": [], 
+        "contas_fixas": [], 
+        "metas": [], 
+        "salario": 0.0, 
+        "extra": 0.0, 
         "pct_invest": 10.0
     }
     if os.path.exists("dados.json"):
         try:
             with open("dados.json", "r") as f:
                 d = json.load(f)
+                # Garante que todas as chaves do modelo existam no arquivo lido
                 for k, v in modelo.items():
-                    if k not in d: d[k] = v
+                    if k not in d:
+                        d[k] = v
                 return d
-        except: return modelo
+        except:
+            return modelo
     return modelo
 
 def salvar_dados(dados):
