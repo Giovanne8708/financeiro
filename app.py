@@ -2,45 +2,50 @@ import streamlit as st
 import json
 import os
 import pandas as pd
-import plotly.express as px
 
 # --- CONFIGURAÇÕES DO APP ---
-st.set_page_config(page_title="Financeiro Pro", layout="centered", page_icon="💰")
+st.set_page_config(page_title="Financeiro Pro", layout="centered", page_icon="📈")
 
-# --- CSS AVANÇADO ---
+# --- ESTILO CSS PARA DESIGN MODERNO ---
 st.markdown("""
     <style>
+    /* Fundo e Container Principal */
     .main { background-color: #0d1117; }
-    .section-card {
-        background-color: #161b22;
-        padding: 20px;
-        border-radius: 15px;
-        border: 1px solid #30363d;
-        margin-bottom: 25px;
+    
+    /* Estilização dos Cards */
+    .st-emotion-cache-1r6slb0 { border-radius: 15px; border: 1px solid #30363d; padding: 20px; background-color: #161b22; }
+    
+    /* Títulos e Métricas */
+    h1, h2, h3 { font-family: 'Inter', sans-serif; color: #58a6ff !important; font-weight: 700; }
+    div[data-testid="stMetricValue"] { font-size: 1.8rem !important; color: #ffffff !important; }
+    
+    /* Botões Modernos */
+    .stButton>button {
+        width: 100%;
+        border-radius: 12px;
+        height: 3em;
+        background-color: #238636;
+        color: white;
+        font-weight: bold;
+        border: none;
+        transition: 0.3s;
     }
-    h1, h2, h3 { color: #58a6ff !important; }
-    .stMetric { background-color: #1f2937 !important; border-radius: 12px; padding: 15px !important; }
-    .stButton>button { border-radius: 10px; font-weight: 600; }
+    .stButton>button:hover { background-color: #2ea043; border: none; color: white; }
+    
+    /* Card de Conta Individual */
+    .conta-card {
+        background-color: #0d1117;
+        padding: 15px;
+        border-radius: 10px;
+        border: 1px solid #30363d;
+        margin-bottom: 10px;
+    }
     </style>
     """, unsafe_allow_html=True)
 
-# --- FUNÇÕES DE SUPORTE ---
-def format_num(valor):
-    """Converte texto da interface (ex: 1.081,35) em número real (1081.35)"""
-    if isinstance(valor, str):
-        # Remove símbolos e garante que o ponto seja o separador decimal
-        valor = valor.replace('R$', '').replace(' ', '').replace('.', '').replace(',', '.')
-    try:
-        return float(valor)
-    except:
-        return 0.0
-
-def formatar_moeda_br(valor):
-    """Converte número real (1081.35) em texto brasileiro (R$ 1.081,35)"""
-    return f"R$ {valor:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
-
+# --- FUNÇÕES DE DADOS ---
 def carregar_dados():
-    modelo = {"patrimonio": 0.0, "gastos_diarios": [], "contas_fixas": [], "metas": [], "salario": 0.0, "extra": 0.0, "pct": 10.0, "quinzena": "1ª Quinzena"}
+    modelo = {"patrimonio": 0.0, "gastos_diarios": [], "contas_fixas": [], "salario": 0.0, "extra": 0.0, "pct": 10.0, "quinzena": "1ª Quinzena"}
     if os.path.exists("dados.json"):
         try:
             with open("dados.json", "r") as f:
@@ -56,150 +61,143 @@ def salvar_dados(dados):
     with open("dados.json", "w") as f:
         json.dump(dados, f, indent=4)
 
-# --- LOGIN ---
+def formatar_br(valor):
+    return f"R$ {valor:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+
+# --- INICIALIZAÇÃO ---
+dados = carregar_dados()
+
+# --- LOGIN SIMPLES ---
 if "autenticado" not in st.session_state:
     st.session_state.autenticado = False
 
 if not st.session_state.autenticado:
     st.markdown("<h1 style='text-align: center;'>🔐 Financeiro</h1>", unsafe_allow_html=True)
-    u = st.text_input("Usuário")
-    s = st.text_input("Senha", type="password")
-    if st.button("Entrar"):
-        if u == "giovanne" and s == "8708":
-            st.session_state.autenticado = True
-            st.rerun()
-        else:
-            st.error("Incorreto")
+    with st.container(border=True):
+        u = st.text_input("Usuário")
+        s = st.text_input("Senha", type="password")
+        if st.button("Acessar Sistema"):
+            if u == "giovanne" and s == "8708":
+                st.session_state.autenticado = True
+                st.rerun()
+            else:
+                st.error("Credenciais inválidas")
     st.stop()
 
-# --- CARREGAMENTO ---
-dados = carregar_dados()
+# --- CONTEÚDO PRINCIPAL ---
+st.markdown("<h1 style='text-align: center;'>📱 Meu Financeiro</h1>", unsafe_allow_html=True)
 
-# Sidebar
+# Resumo de Saldo em destaque
+total_gastos = sum(g['valor'] for g in dados['gastos_diarios'])
+saldo_livre = (dados['salario'] + dados['extra']) - total_gastos
+aporte = ((dados['salario'] + dados['extra']) * (dados['pct'] / 100)) / 2
+
+col_m1, col_m2 = st.columns(2)
+with col_m1:
+    st.metric("Saldo Disponível", formatar_br(saldo_livre))
+with col_m2:
+    st.metric("Investimento Sugerido", formatar_br(aporte))
+
+st.divider()
+
+# Abas Modernas
+tab1, tab2, tab3 = st.tabs(["💰 Fluxo Atual", "📝 Contas/Parcelas", "📊 Relatório"])
+
+with tab1:
+    with st.container(border=True):
+        st.subheader("📥 Entradas da Quinzena")
+        c1, c2, c3 = st.columns(3)
+        v_sal = c1.number_input("Salário", value=float(dados['salario']), format="%.2f")
+        v_ext = c2.number_input("Extras", value=float(dados['extra']), format="%.2f")
+        v_pct = c3.number_input("Meta %", value=float(dados['pct']), format="%.1f")
+        
+        if (v_sal != dados['salario'] or v_ext != dados['extra'] or v_pct != dados['pct']):
+            dados.update({"salario": v_sal, "extra": v_ext, "pct": v_pct})
+            salvar_dados(dados)
+            st.rerun()
+
+    st.write("")
+    with st.container(border=True):
+        st.subheader("🛒 Novo Gasto")
+        g_n = st.text_input("O que comprou?", placeholder="Ex: Mercado, Posto...")
+        g_v = st.number_input("Valor R$", min_value=0.0, format="%.2f", key="gasto_v")
+        g_c = st.selectbox("Categoria", ["Alimentação", "Transporte", "Lazer", "Saúde", "Casa", "Outros"])
+        if st.button("Registrar Gasto"):
+            if g_n and g_v > 0:
+                dados['gastos_diarios'].append({"desc": g_n, "valor": g_v, "cat": g_c})
+                salvar_dados(dados)
+                st.toast(f"Gasto de {formatar_br(g_v)} salvo!")
+                st.rerun()
+
+with tab2:
+    st.subheader("📅 Gestão de Parcelas")
+    
+    with st.expander("+ Adicionar Conta Parcelada"):
+        nc = st.text_input("Nome do Item", placeholder="Ex: iPhone, Notebook...")
+        vc = st.number_input("Valor da Parcela R$", min_value=0.0, format="%.2f")
+        cp1, cp2 = st.columns(2)
+        p_at = cp1.number_input("Parc. Atual", 1, 100, 1)
+        p_to = cp2.number_input("Total Parc.", 1, 100, 1)
+        if st.button("Cadastrar Conta"):
+            if nc and vc > 0:
+                dados['contas_fixas'].append({"nome": nc, "valor": vc, "atual": p_at, "total": p_to})
+                salvar_dados(dados)
+                st.rerun()
+
+    st.write("")
+    # Listagem de contas com design de card
+    for i, c in enumerate(dados['contas_fixas']):
+        with st.container(border=True):
+            col_a, col_b = st.columns([3, 1])
+            col_a.markdown(f"### {c['nome']}")
+            col_b.markdown(f"**{formatar_br(c['valor'])}**")
+            
+            # Barra de progresso da parcela
+            progresso = c['atual'] / c['total']
+            st.progress(progresso)
+            st.caption(f"Progresso: Parcela {c['atual']} de {c['total']}")
+            
+            cb1, cb2 = st.columns(2)
+            if cb1.button(f"PAGAR PARCELA {c['atual']}", key=f"p_{i}"):
+                dados['gastos_diarios'].append({"desc": f"Parc. {c['nome']} ({c['atual']}/{c['total']})", "valor": c['valor'], "cat": "Fixo"})
+                c['atual'] += 1
+                if c['atual'] > c['total']:
+                    dados['contas_fixas'].pop(i)
+                salvar_dados(dados)
+                st.rerun()
+            if cb2.button("Excluir Conta", key=f"del_{i}"):
+                dados['contas_fixas'].pop(i)
+                salvar_dados(dados)
+                st.rerun()
+
+with tab3:
+    st.subheader("📈 Resumo de Gastos")
+    if dados['gastos_diarios']:
+        df = pd.DataFrame(dados['gastos_diarios'])
+        st.dataframe(df, use_container_width=True)
+        
+        # Botão para virar quinzena
+        st.divider()
+        if st.button("🔄 FINALIZAR QUINZENA (Limpar Gastos e Virar)"):
+            dados["extra"] = saldo_livre
+            dados["salario"] = 0.0
+            dados["gastos_diarios"] = []
+            dados["quinzena"] = "2ª Quinzena" if dados["quinzena"] == "1ª Quinzena" else "1ª Quinzena"
+            salvar_dados(dados)
+            st.success("Quinzena virada com sucesso!")
+            st.rerun()
+    else:
+        st.info("Nenhum gasto registrado nesta quinzena.")
+
+# Menu Lateral para Reset
 with st.sidebar:
-    st.title("⚙️ Sistema")
+    st.title("⚙️ Configurações")
     if st.button("Sair"):
         st.session_state.autenticado = False
         st.rerun()
     st.divider()
-    st.subheader("🚨 Reset")
-    confirma = st.checkbox("Desejo apagar tudo")
-    if st.button("LIMPAR BANCO DE DADOS"):
-        if confirma:
-            dados = {"patrimonio": 0.0, "gastos_diarios": [], "contas_fixas": [], "metas": [], "salario": 0.0, "extra": 0.0, "pct": 10.0, "quinzena": "1ª Quinzena"}
-            salvar_dados(dados)
-            st.rerun()
-
-st.markdown(f"<h1 style='text-align: center;'>📊 Financeiro Pro</h1>", unsafe_allow_html=True)
-st.markdown(f"<p style='text-align: center; color: #8b949e;'>{dados['quinzena']}</p>", unsafe_allow_html=True)
-
-tab1, tab2, tab3 = st.tabs(["💰 Fluxo", "🎯 Metas", "📈 Análise"])
-
-with tab1:
-    # --- CARD ENTRADAS ---
-    st.markdown("<div class='section-card'>", unsafe_allow_html=True)
-    col1, col2, col3 = st.columns(3)
-    # Mostramos o valor formatado para o usuário, mas salvamos como float
-    txt_sal = col1.text_input("Recebido", value=str(dados['salario']))
-    txt_ext = col2.text_input("Extra", value=str(dados['extra']))
-    txt_pct = col3.text_input("Meta %", value=str(dados['pct']))
-    
-    val_sal, val_ext, val_pct = format_num(txt_sal), format_num(txt_ext), format_num(txt_pct)
-    
-    if (val_sal, val_ext, val_pct) != (dados['salario'], dados['extra'], dados['pct']):
-        dados.update({"salario": val_sal, "extra": val_ext, "pct": val_pct})
-        salvar_dados(dados)
-    st.markdown("</div>", unsafe_allow_html=True)
-
-    # --- CÁLCULOS ---
-    total_gastos = sum(g['valor'] for g in dados['gastos_diarios'])
-    saldo_livre = (val_sal + val_ext) - total_gastos
-    aporte = ((val_sal + val_ext) * (val_pct / 100)) / 2
-    
-    # Exibição das Métricas
-    c_met1, c_met2 = st.columns(2)
-    c_met1.metric("DISPONÍVEL AGORA", formatar_moeda_br(saldo_livre), delta=f"Total: {formatar_moeda_br(val_sal+val_ext)}")
-    c_met2.metric("INVESTIMENTO (Q)", formatar_moeda_br(aporte))
-
-    # --- INVESTIMENTOS ---
-    st.markdown("<div class='section-card'>", unsafe_allow_html=True)
-    st.subheader("🏦 Guardar")
-    ci1, ci2 = st.columns(2)
-    if ci1.button(f"CDB: {formatar_moeda_br(aporte)}"):
-        dados['patrimonio'] += aporte
-        dados['gastos_diarios'].append({"desc": "Investimento CDB", "valor": aporte, "cat": "Investimento"})
-        salvar_dados(dados)
-        st.rerun()
-    if ci2.button(f"TESOURO: {formatar_moeda_br(aporte)}"):
-        dados['patrimonio'] += aporte
-        dados['gastos_diarios'].append({"desc": "Investimento Tesouro", "valor": aporte, "cat": "Investimento"})
-        salvar_dados(dados)
-        st.rerun()
-    st.markdown("</div>", unsafe_allow_html=True)
-
-    # --- CONTAS ---
-    st.markdown("<div class='section-card'>", unsafe_allow_html=True)
-    st.subheader("📝 Contas")
-    with st.expander("+ Nova Conta"):
-        nc = st.text_input("Nome")
-        vc = st.text_input("Valor")
-        if st.button("Salvar Conta"):
-            v_f = format_num(vc)
-            if nc and v_f > 0:
-                dados['contas_fixas'].append({"nome": nc, "valor": v_f, "atual": 1, "total": 1})
-                salvar_dados(dados)
+    if st.checkbox("Liberar Reset Total"):
+        if st.button("LIMPAR TUDO"):
+            if os.path.exists("dados.json"):
+                os.remove("dados.json")
                 st.rerun()
-
-    for i, c in enumerate(dados['contas_fixas']):
-        col_c1, col_c2, col_c3 = st.columns([2, 1, 1])
-        col_c1.write(f"**{c['nome']}**")
-        col_c2.write(formatar_moeda_br(c['valor']))
-        if col_c3.button("PAGAR", key=f"p_{i}"):
-            dados['gastos_diarios'].append({"desc": f"Pago: {c['nome']}", "valor": c['valor'], "cat": "Fixo"})
-            dados['contas_fixas'].pop(i)
-            salvar_dados(dados)
-            st.rerun()
-    st.markdown("</div>", unsafe_allow_html=True)
-
-    # --- GASTOS ---
-    st.markdown("<div class='section-card'>", unsafe_allow_html=True)
-    st.subheader("🛒 Gasto Rápido")
-    gn = st.text_input("O que?", key="gn")
-    gv = st.text_input("Valor R$", key="gv")
-    gc = st.selectbox("Cat.", ["Alimentação", "Transporte", "Lazer", "Saúde", "Casa", "Outros"])
-    if st.button("Lançar"):
-        v_g = format_num(gv)
-        if gn and v_g > 0:
-            dados['gastos_diarios'].append({"desc": gn, "valor": v_g, "cat": gc})
-            salvar_dados(dados)
-            st.rerun()
-    st.markdown("</div>", unsafe_allow_html=True)
-
-with tab2:
-    st.subheader("🎯 Metas")
-    st.metric("Patrimônio Total", formatar_moeda_br(dados['patrimonio']))
-    for i, m in enumerate(dados['metas']):
-        prog = min(dados['patrimonio'] / m['alvo'], 1.0) if m['alvo'] > 0 else 0
-        st.write(f"**{m['nome']}** - {formatar_moeda_br(m['alvo'])}")
-        st.progress(prog)
-        if st.button(f"Remover {m['nome']}", key=f"rm_{i}"):
-            dados['metas'].pop(i)
-            salvar_dados(dados)
-            st.rerun()
-
-with tab3:
-    st.subheader("📈 Análise")
-    if dados['gastos_diarios']:
-        df = pd.DataFrame(dados['gastos_diarios'])
-        fig = px.pie(df, values='valor', names='cat', hole=0.4)
-        st.plotly_chart(fig, use_container_width=True)
-        st.dataframe(df, use_container_width=True)
-    
-    st.divider()
-    if st.button("🔄 VIRAR QUINZENA"):
-        dados["extra"] = saldo_livre
-        dados["salario"] = 0.0
-        dados["gastos_diarios"] = []
-        dados["quinzena"] = "2ª Quinzena" if dados["quinzena"] == "1ª Quinzena" else "1ª Quinzena"
-        salvar_dados(dados)
-        st.rerun()
