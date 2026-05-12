@@ -82,10 +82,10 @@ col_m2.metric("Meta de Investimento", formatar_br(investimento_sugerido))
 
 st.divider()
 
-tab1, tab2, tab3 = st.tabs(["💰 Fluxo Atual", "🎯 Investimentos & Metas", "📝 Contas/Parcelas"])
+# ABA ADICIONADA: Extrato Mensal
+tab1, tab2, tab3, tab4 = st.tabs(["💰 Fluxo Atual", "🎯 Ativos & Metas", "📝 Contas", "📋 Extrato Mensal"])
 
 with tab1:
-    # --- CARD ENTRADAS ---
     with st.container(border=True):
         st.subheader("📥 Entradas")
         c1, c2, c3 = st.columns(3)
@@ -98,26 +98,20 @@ with tab1:
             salvar_dados(dados)
             st.rerun()
 
-    # --- CARD INVESTIMENTOS ---
     with st.container(border=True):
-        st.subheader("🏦 Realizar Investimento")
+        st.subheader("🏦 Investir")
         ci1, ci2 = st.columns(2)
-        
-        if ci1.button(f"INVESTIR CDB: {formatar_br(investimento_sugerido)}"):
+        if ci1.button(f"CDB: {formatar_br(investimento_sugerido)}"):
             dados['cdb_total'] += investimento_sugerido
             dados['gastos_diarios'].append({"desc": "Aplicação CDB", "valor": investimento_sugerido, "cat": "Investimento"})
             salvar_dados(dados)
-            st.toast("Saldo de CDB atualizado!")
             st.rerun()
-            
-        if ci2.button(f"INVESTIR TESOURO: {formatar_br(investimento_sugerido)}"):
+        if ci2.button(f"TESOURO: {formatar_br(investimento_sugerido)}"):
             dados['tesouro_total'] += investimento_sugerido
             dados['gastos_diarios'].append({"desc": "Aplicação Tesouro", "valor": investimento_sugerido, "cat": "Investimento"})
             salvar_dados(dados)
-            st.toast("Saldo de Tesouro atualizado!")
             st.rerun()
 
-    # --- NOVO GASTO ---
     with st.container(border=True):
         st.subheader("🛒 Novo Gasto")
         g_n = st.text_input("O que comprou?")
@@ -130,9 +124,7 @@ with tab1:
                 st.rerun()
 
 with tab2:
-    # --- VISUALIZAÇÃO POR ATIVO ---
     st.markdown("<h2 style='text-align: center;'>📈 Meus Ativos</h2>", unsafe_allow_html=True)
-    
     c_cdb, c_tes = st.columns(2)
     with c_cdb:
         with st.container(border=True):
@@ -142,11 +134,9 @@ with tab2:
         with st.container(border=True):
             st.markdown("### 🏛️ Tesouro")
             st.markdown(f"**{formatar_br(dados['tesouro_total'])}**")
-
+    
     st.divider()
-
-    # Gerenciar Metas
-    st.subheader("🎯 Progresso das Metas")
+    st.subheader("🎯 Metas")
     with st.expander("+ Novo Objetivo"):
         m_nome = st.text_input("Objetivo")
         m_valor = st.number_input("Quanto custa? R$", min_value=0.0, format="%.2f")
@@ -158,27 +148,17 @@ with tab2:
 
     for i, m in enumerate(dados['metas']):
         with st.container(border=True):
-            col_a, col_b = st.columns([3, 1])
-            col_a.markdown(f"### {m['nome']}")
-            col_b.markdown(f"**{formatar_br(m['alvo'])}**")
-            
-            progresso = min(patrimonio_total / m['alvo'], 1.0) if m['alvo'] > 0 else 0
-            st.progress(progresso)
-            
-            faltam = max(m['alvo'] - patrimonio_total, 0)
-            if faltam > 0:
-                st.write(f"Faltam **{formatar_br(faltam)}** (Considerando CDB + Tesouro)")
-            else:
-                st.success("🎉 Objetivo alcançado!")
-            
-            if st.button("Excluir Objetivo", key=f"del_m_{i}"):
+            st.markdown(f"**{m['nome']}** - {formatar_br(m['alvo'])}")
+            prog = min(patrimonio_total / m['alvo'], 1.0) if m['alvo'] > 0 else 0
+            st.progress(prog)
+            if st.button("Remover Meta", key=f"del_m_{i}"):
                 dados['metas'].pop(i)
                 salvar_dados(dados)
                 st.rerun()
 
 with tab3:
-    st.subheader("📅 Gestão de Parcelas")
-    with st.expander("+ Adicionar Conta Parcelada"):
+    st.subheader("📅 Parcelas")
+    with st.expander("+ Adicionar Conta"):
         nc = st.text_input("Item")
         vc = st.number_input("Valor Parcela", min_value=0.0, format="%.2f")
         p_at = st.number_input("Parc. Atual", 1, 100, 1)
@@ -193,19 +173,36 @@ with tab3:
         with st.container(border=True):
             st.markdown(f"**{c['nome']}** - {formatar_br(c['valor'])}")
             st.progress(c['atual'] / c['total'])
-            st.caption(f"Parcela {c['atual']} de {c['total']}")
-            
             if st.button(f"PAGAR PARCELA {c['atual']}", key=f"pag_{i}"):
                 dados['gastos_diarios'].append({"desc": f"Parc. {c['nome']}", "valor": c['valor'], "cat": "Fixo"})
                 c['atual'] += 1
-                if c['atual'] > c['total']:
-                    dados['contas_fixas'].pop(i)
+                if c['atual'] > c['total']: dados['contas_fixas'].pop(i)
                 salvar_dados(dados)
                 st.rerun()
+
+# NOVA ABA IMPLEMENTADA
+with tab4:
+    st.subheader("📋 Extrato de Gastos")
+    if dados['gastos_diarios']:
+        # Criar Tabela organizada
+        df = pd.DataFrame(dados['gastos_diarios'])
+        df.columns = ["Descrição", "Valor (R$)", "Categoria"]
+        
+        # Mostrar o total gasto no topo do extrato
+        st.markdown(f"### Total Gasto nesta Quinzena: <span style='color:#ff4b4b'>{formatar_br(total_gastos)}</span>", unsafe_allow_html=True)
+        
+        # Exibir a tabela
+        st.dataframe(df, use_container_width=True, hide_index=True)
+        
+        st.divider()
+        st.caption("Dica: Use o botão de Virar Quinzena no menu lateral para limpar este extrato ao mudar de mês.")
+    else:
+        st.info("Nenhum gasto registrado até agora.")
 
 # Sidebar
 with st.sidebar:
     st.title("⚙️ Sistema")
+    st.write(f"Período: **{dados['quinzena']}**")
     if st.button("Sair"):
         st.session_state.autenticado = False
         st.rerun()
@@ -216,6 +213,7 @@ with st.sidebar:
         dados["gastos_diarios"] = []
         dados["quinzena"] = "2ª Quinzena" if dados["quinzena"] == "1ª Quinzena" else "1ª Quinzena"
         salvar_dados(dados)
+        st.success("Dados resetados para a nova quinzena!")
         st.rerun()
     st.divider()
     if st.checkbox("Liberar Reset"):
