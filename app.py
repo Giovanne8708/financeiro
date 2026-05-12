@@ -43,7 +43,8 @@ st.markdown("""
 # --- FUNÇÕES DE SISTEMA ---
 def format_num(valor):
     if isinstance(valor, str):
-        valor = valor.replace('R$', '').replace('.', '').replace(',', '.').strip()
+        # Remove R$, espaços e pontos de milhar, troca vírgula por ponto
+        valor = valor.replace('R$', '').replace(' ', '').replace('.', '').replace(',', '.')
     try:
         return float(valor)
     except:
@@ -129,7 +130,7 @@ with tab1:
     aporte = ((val_sal + val_ext) * (val_pct / 100)) / 2
     
     c_met1, c_met2 = st.columns(2)
-    c_met1.metric("DISPONÍVEL AGORA", f"R$ {saldo_livre:.2f}", delta=f"R$ {val_sal+val_ext:.2f} Total")
+    c_met1.metric("DISPONÍVEL AGORA", saldo_formatado, delta=f"R$ {val_sal+val_ext:.2f} Total")
     c_met2.metric("INVESTIMENTO (Q)", f"R$ {aporte:.2f}", delta_color="normal")
 
     # --- CARD DE INVESTIR ---
