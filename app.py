@@ -17,7 +17,7 @@ st.set_page_config(
 )
 
 # =========================================================
-# CSS
+# CSS PREMIUM
 # =========================================================
 
 st.markdown("""
@@ -25,13 +25,14 @@ st.markdown("""
 
 .stApp{
     background: linear-gradient(135deg,#0f172a,#111827);
+    color:white;
 }
 
-/* CARDS */
+/* CARDS METRIC */
 
 [data-testid="stMetric"]{
 
-    background:rgba(17,24,39,0.95);
+    background: rgba(17,24,39,0.95);
     border:1px solid rgba(255,255,255,0.08);
     padding:18px;
     border-radius:22px;
@@ -43,13 +44,19 @@ st.markdown("""
 .stButton > button{
 
     width:100%;
-    height:48px;
+    height:50px;
     border:none;
     border-radius:14px;
     background:linear-gradient(90deg,#2563eb,#3b82f6);
     color:white;
     font-weight:bold;
     transition:0.3s;
+    font-size:16px;
+}
+
+.stButton > button:hover{
+
+    transform:translateY(-2px);
 }
 
 /* INPUTS */
@@ -63,6 +70,21 @@ st.markdown("""
     border:1px solid #334155;
 }
 
+/* SELECT */
+
+.stSelectbox div[data-baseweb="select"]{
+
+    background:#1e293b;
+    border-radius:14px;
+}
+
+/* TABS */
+
+.stTabs [data-baseweb="tab"]{
+    font-size:16px;
+    padding:10px;
+}
+
 </style>
 """, unsafe_allow_html=True)
 
@@ -73,6 +95,7 @@ st.markdown("""
 def carregar_dados():
 
     modelo = {
+
         "saldo_conta": 0.0,
         "cdb_total": 0.0,
         "tesouro_total": 0.0,
@@ -127,7 +150,21 @@ if "autenticado" not in st.session_state:
 
 if not st.session_state.autenticado:
 
-    st.title("🔐 Financeiro Pro")
+    st.markdown("""
+    <div style="
+    background:#111827;
+    padding:35px;
+    border-radius:25px;
+    margin-top:80px;
+    border:1px solid rgba(255,255,255,0.08);
+    text-align:center;
+    ">
+    <h1>🔐 Financeiro Pro</h1>
+    <p style="color:gray;">
+    Faça login para continuar
+    </p>
+    </div>
+    """, unsafe_allow_html=True)
 
     usuario = st.text_input("Usuário")
 
@@ -149,7 +186,7 @@ if not st.session_state.autenticado:
         if usuario == "giovanne" and senha_input == senha_correta:
 
             st.session_state.autenticado = True
-            st.success("Login realizado!")
+            st.success("✅ Login realizado!")
             st.rerun()
 
         else:
@@ -194,7 +231,10 @@ box-shadow:0px 8px 25px rgba(0,0,0,0.35);
 💰 Financeiro Pro
 </h1>
 
-<p style="margin-top:5px;color:#94a3b8;">
+<p style="
+margin-top:5px;
+color:#94a3b8;
+">
 Seu controle financeiro inteligente
 </p>
 
@@ -208,7 +248,7 @@ Seu controle financeiro inteligente
 c1, c2 = st.columns(2)
 
 c1.metric(
-    "💳 Saldo em Conta",
+    "💳 Saldo",
     formatar_br(dados['saldo_conta'])
 )
 
@@ -246,6 +286,8 @@ tab1, tab2, tab3, tab4 = st.tabs([
 
 with tab1:
 
+    st.subheader("💳 Saldo Bancário")
+
     saldo = st.number_input(
         "Saldo Atual",
         value=float(dados['saldo_conta']),
@@ -258,13 +300,15 @@ with tab1:
 
         salvar_dados(dados)
 
-        st.success("Saldo atualizado!")
+        st.success("✅ Saldo atualizado!")
 
 # =========================================================
 # GASTOS
 # =========================================================
 
 with tab2:
+
+    st.subheader("💸 Registrar Gasto")
 
     desc = st.text_input("Descrição")
 
@@ -302,13 +346,99 @@ with tab2:
 
             salvar_dados(dados)
 
-            st.success("Gasto registrado!")
+            st.success("✅ Gasto registrado!")
+
+    st.divider()
+
+    st.subheader("🧾 Últimos Gastos")
+
+    ultimos = dados['gastos_diarios'][-5:][::-1]
+
+    for g in ultimos:
+
+        st.markdown(f"""
+        <div style="
+        background:#111827;
+        padding:18px;
+        border-radius:18px;
+        margin-bottom:10px;
+        border-left:5px solid #ef4444;
+        ">
+
+        <h4 style="margin:0;">
+        {g['desc']}
+        </h4>
+
+        <p style="color:gray;margin:0;">
+        {g['cat']}
+        </p>
+
+        <h3 style="margin-top:8px;">
+        {formatar_br(g['valor'])}
+        </h3>
+
+        </div>
+        """, unsafe_allow_html=True)
 
 # =========================================================
 # INVESTIMENTOS
 # =========================================================
 
 with tab3:
+
+    st.subheader("📈 Carteira")
+
+    i1, i2, i3 = st.columns(3)
+
+    i1.metric(
+        "CDB",
+        formatar_br(dados['cdb_total'])
+    )
+
+    i2.metric(
+        "Tesouro",
+        formatar_br(dados['tesouro_total'])
+    )
+
+    i3.metric(
+        "Total",
+        formatar_br(total_investido)
+    )
+
+    st.divider()
+
+    st.subheader("💵 Aplicar Investimento")
+
+    valor_inv = st.number_input(
+        "Valor para investir",
+        min_value=0.0,
+        format="%.2f"
+    )
+
+    tipo = st.selectbox(
+        "Tipo",
+        [
+            "CDB",
+            "Tesouro"
+        ]
+    )
+
+    if st.button("Aplicar"):
+
+        if valor_inv > 0:
+
+            if tipo == "CDB":
+                dados['cdb_total'] += valor_inv
+            else:
+                dados['tesouro_total'] += valor_inv
+
+            dados['saldo_conta'] -= valor_inv
+
+            salvar_dados(dados)
+
+            st.success("📈 Investimento realizado!")
+
+    st.divider()
 
     st.subheader("🎯 Metas")
 
@@ -331,7 +461,7 @@ with tab3:
 
         salvar_dados(dados)
 
-        st.success("Meta criada!")
+        st.success("🎯 Meta criada!")
 
     for meta in dados['metas']:
 
@@ -353,17 +483,22 @@ with tab3:
         border-radius:20px;
         margin-bottom:12px;
         border:1px solid rgba(255,255,255,0.08);
+        box-shadow:0px 8px 25px rgba(0,0,0,0.35);
         ">
 
-        <h2>
+        <h2 style="margin-bottom:10px;">
         🎯 {meta['nome']}
         </h2>
 
-        <p>
+        <p style="margin:0;color:#cbd5e1;">
         Meta: {formatar_br(alvo)}
         </p>
 
-        <p style="color:#22c55e;">
+        <p style="
+        margin-top:8px;
+        color:#22c55e;
+        font-weight:bold;
+        ">
         ✅ {porcentagem:.1f}% concluído
         </p>
 
@@ -377,16 +512,60 @@ with tab3:
         st.progress(progresso)
 
 # =========================================================
-# RELATÓRIOS
+# RELATÓRIOS PRO
 # =========================================================
 
 with tab4:
 
+    st.subheader("📊 Central Inteligente")
+
     if dados['gastos_diarios']:
 
-        df = pd.DataFrame(
-            dados['gastos_diarios']
+        df = pd.DataFrame(dados['gastos_diarios'])
+
+        total_mes = df['valor'].sum()
+
+        media_gastos = df['valor'].mean()
+
+        maior_gasto = df['valor'].max()
+
+        qtd_gastos = len(df)
+
+        # =========================
+        # MÉTRICAS
+        # =========================
+
+        a1, a2 = st.columns(2)
+
+        a1.metric(
+            "💸 Total Gasto",
+            formatar_br(total_mes)
         )
+
+        a2.metric(
+            "📊 Média",
+            formatar_br(media_gastos)
+        )
+
+        a3, a4 = st.columns(2)
+
+        a3.metric(
+            "🔥 Maior Gasto",
+            formatar_br(maior_gasto)
+        )
+
+        a4.metric(
+            "🧾 Registros",
+            qtd_gastos
+        )
+
+        st.divider()
+
+        # =========================
+        # PIZZA
+        # =========================
+
+        st.subheader("🥧 Distribuição dos Gastos")
 
         fig = px.pie(
             df,
@@ -395,10 +574,82 @@ with tab4:
             hole=0.65
         )
 
+        fig.update_layout(
+            paper_bgcolor='#0f172a',
+            plot_bgcolor='#0f172a',
+            font_color='white'
+        )
+
         st.plotly_chart(
             fig,
             use_container_width=True
         )
+
+        # =========================
+        # BARRAS
+        # =========================
+
+        st.subheader("📈 Gastos por Categoria")
+
+        categoria_df = df.groupby(
+            'cat'
+        )['valor'].sum().reset_index()
+
+        fig2 = px.bar(
+            categoria_df,
+            x='cat',
+            y='valor',
+            text_auto=True
+        )
+
+        fig2.update_layout(
+            paper_bgcolor='#0f172a',
+            plot_bgcolor='#0f172a',
+            font_color='white'
+        )
+
+        st.plotly_chart(
+            fig2,
+            use_container_width=True
+        )
+
+        # =========================
+        # ÚLTIMOS MOVIMENTOS
+        # =========================
+
+        st.subheader("🧾 Últimos Movimentos")
+
+        ultimos = df.tail(5).iloc[::-1]
+
+        for _, g in ultimos.iterrows():
+
+            st.markdown(f"""
+            <div style="
+            background:#111827;
+            padding:18px;
+            border-radius:18px;
+            margin-bottom:10px;
+            border-left:5px solid #3b82f6;
+            ">
+
+            <h4 style="margin:0;">
+            {g['desc']}
+            </h4>
+
+            <p style="margin:0;color:gray;">
+            {g['cat']}
+            </p>
+
+            <h3 style="margin-top:8px;">
+            {formatar_br(g['valor'])}
+            </h3>
+
+            </div>
+            """, unsafe_allow_html=True)
+
+    else:
+
+        st.info("Nenhum gasto registrado ainda.")
 
 # =========================================================
 # SIDEBAR
@@ -412,3 +663,22 @@ with st.sidebar:
 
         st.session_state.autenticado = False
         st.rerun()
+
+    st.divider()
+
+    st.subheader("🗑️ Reset")
+
+    if st.button("Resetar Tudo"):
+
+        dados = {
+
+            "saldo_conta": 0.0,
+            "cdb_total": 0.0,
+            "tesouro_total": 0.0,
+            "gastos_diarios": [],
+            "metas": []
+        }
+
+        salvar_dados(dados)
+
+        st.warning("Tudo resetado!")
