@@ -28,10 +28,9 @@ st.markdown("""
     color:white;
 }
 
-/* CARDS METRIC */
+/* CARDS */
 
 [data-testid="stMetric"]{
-
     background: rgba(17,24,39,0.95);
     border:1px solid rgba(255,255,255,0.08);
     padding:18px;
@@ -42,7 +41,6 @@ st.markdown("""
 /* BOTÕES */
 
 .stButton > button{
-
     width:100%;
     height:50px;
     border:none;
@@ -50,20 +48,13 @@ st.markdown("""
     background:linear-gradient(90deg,#2563eb,#3b82f6);
     color:white;
     font-weight:bold;
-    transition:0.3s;
     font-size:16px;
-}
-
-.stButton > button:hover{
-
-    transform:translateY(-2px);
 }
 
 /* INPUTS */
 
 .stTextInput input,
 .stNumberInput input{
-
     background:#1e293b;
     color:white;
     border-radius:14px;
@@ -73,16 +64,8 @@ st.markdown("""
 /* SELECT */
 
 .stSelectbox div[data-baseweb="select"]{
-
     background:#1e293b;
     border-radius:14px;
-}
-
-/* TABS */
-
-.stTabs [data-baseweb="tab"]{
-    font-size:16px;
-    padding:10px;
 }
 
 </style>
@@ -95,7 +78,6 @@ st.markdown("""
 def carregar_dados():
 
     modelo = {
-
         "saldo_conta": 0.0,
         "cdb_total": 0.0,
         "tesouro_total": 0.0,
@@ -186,7 +168,6 @@ if not st.session_state.autenticado:
         if usuario == "giovanne" and senha_input == senha_correta:
 
             st.session_state.autenticado = True
-            st.success("✅ Login realizado!")
             st.rerun()
 
         else:
@@ -300,7 +281,7 @@ with tab1:
 
         salvar_dados(dados)
 
-        st.success("✅ Saldo atualizado!")
+        st.toast("✅ Saldo atualizado!")
 
 # =========================================================
 # GASTOS
@@ -346,7 +327,7 @@ with tab2:
 
             salvar_dados(dados)
 
-            st.success("✅ Gasto registrado!")
+            st.toast("✅ Gasto registrado!")
 
     st.divider()
 
@@ -436,7 +417,7 @@ with tab3:
 
             salvar_dados(dados)
 
-            st.success("📈 Investimento realizado!")
+            st.toast("📈 Investimento realizado!")
 
     st.divider()
 
@@ -461,7 +442,7 @@ with tab3:
 
         salvar_dados(dados)
 
-        st.success("🎯 Meta criada!")
+        st.toast("🎯 Meta criada!")
 
     for meta in dados['metas']:
 
@@ -483,22 +464,17 @@ with tab3:
         border-radius:20px;
         margin-bottom:12px;
         border:1px solid rgba(255,255,255,0.08);
-        box-shadow:0px 8px 25px rgba(0,0,0,0.35);
         ">
 
-        <h2 style="margin-bottom:10px;">
+        <h2>
         🎯 {meta['nome']}
         </h2>
 
-        <p style="margin:0;color:#cbd5e1;">
+        <p>
         Meta: {formatar_br(alvo)}
         </p>
 
-        <p style="
-        margin-top:8px;
-        color:#22c55e;
-        font-weight:bold;
-        ">
+        <p style="color:#22c55e;">
         ✅ {porcentagem:.1f}% concluído
         </p>
 
@@ -562,16 +538,21 @@ with tab4:
         st.divider()
 
         # =========================
-        # PIZZA
+        # GRÁFICO BARRAS
         # =========================
 
-        st.subheader("🥧 Distribuição dos Gastos")
+        st.subheader("📈 Gastos por Categoria")
 
-        fig = px.pie(
-            df,
-            names='cat',
-            values='valor',
-            hole=0.65
+        categoria_df = df.groupby(
+            'cat'
+        )['valor'].sum().reset_index()
+
+        fig = px.bar(
+            categoria_df,
+            x='cat',
+            y='valor',
+            text_auto=True,
+            title='Distribuição de Gastos'
         )
 
         fig.update_layout(
@@ -586,32 +567,36 @@ with tab4:
         )
 
         # =========================
-        # BARRAS
+        # LINHA DO TEMPO
         # =========================
 
-        st.subheader("📈 Gastos por Categoria")
+        st.subheader("📊 Evolução dos Gastos")
 
-        categoria_df = df.groupby(
-            'cat'
-        )['valor'].sum().reset_index()
+        try:
 
-        fig2 = px.bar(
-            categoria_df,
-            x='cat',
-            y='valor',
-            text_auto=True
-        )
+            df['ordem'] = range(len(df))
 
-        fig2.update_layout(
-            paper_bgcolor='#0f172a',
-            plot_bgcolor='#0f172a',
-            font_color='white'
-        )
+            fig2 = px.line(
+                df,
+                x='ordem',
+                y='valor',
+                markers=True,
+                title='Linha do Tempo'
+            )
 
-        st.plotly_chart(
-            fig2,
-            use_container_width=True
-        )
+            fig2.update_layout(
+                paper_bgcolor='#0f172a',
+                plot_bgcolor='#0f172a',
+                font_color='white'
+            )
+
+            st.plotly_chart(
+                fig2,
+                use_container_width=True
+            )
+
+        except:
+            pass
 
         # =========================
         # ÚLTIMOS MOVIMENTOS
