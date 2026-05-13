@@ -1,3 +1,4 @@
+```python
 import streamlit as st
 import json
 import os
@@ -139,10 +140,12 @@ def carregar_dados():
 
     return modelo
 
+
 def salvar_dados(dados):
 
     with open("dados.json", "w") as f:
         json.dump(dados, f, indent=4)
+
 
 def formatar_br(valor):
 
@@ -406,13 +409,9 @@ with tab2:
         st.markdown(f"""
         <div style="
         background:#111827;
-
         padding:18px;
-
         border-radius:18px;
-
         margin-bottom:10px;
-
         border-left:5px solid #ef4444;
         ">
 
@@ -536,27 +535,41 @@ with tab3:
 
     for meta in dados['metas']:
 
+        alvo = meta['alvo']
+
         progresso = min(
-            total_investido / meta['alvo'],
+            total_investido / alvo,
             1.0
-        )
+        ) if alvo > 0 else 0
+
+        porcentagem = progresso * 100
+
+        falta = max(alvo - total_investido, 0)
 
         st.markdown(f"""
         <div style="
         background:#111827;
-
         padding:20px;
-
         border-radius:20px;
-
         margin-bottom:12px;
+        border:1px solid rgba(255,255,255,0.08);
+        box-shadow:0px 8px 25px rgba(0,0,0,0.35);
         ">
 
-        <h3>{meta['nome']}</h3>
+        <h2 style="margin-bottom:10px;">
+        🎯 {meta['nome']}
+        </h2>
 
-        <p>
-        Meta:
-        {formatar_br(meta['alvo'])}
+        <p style="margin:0;color:#cbd5e1;">
+        Meta: {formatar_br(alvo)}
+        </p>
+
+        <p style="margin-top:8px;color:#22c55e;font-weight:bold;">
+        ✅ {porcentagem:.1f}% concluído
+        </p>
+
+        <p style="color:#facc15;">
+        💰 Falta: {formatar_br(falta)}
         </p>
 
         </div>
@@ -690,3 +703,4 @@ with st.sidebar:
         st.warning("Tudo resetado!")
 
         st.rerun()
+```
